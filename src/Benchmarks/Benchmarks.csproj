@@ -32,6 +32,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="$(BenchmarksAspNetCoreVersion)" />
     <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel.Https" Version="$(BenchmarksAspNetCoreVersion)" />
     <PackageReference Include="Microsoft.AspNetCore.StaticFiles" Version="$(BenchmarksAspNetCoreVersion)" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.0.0-alpha2-27706" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(BenchmarksAspNetCoreVersion)" />
     <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="$(BenchmarksAspNetCoreVersion)" />
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="$(BenchmarksAspNetCoreVersion)" />
