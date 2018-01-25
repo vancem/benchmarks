@@ -23,7 +23,7 @@ namespace Benchmarks.Middleware
     {
         public Task Echo(long timestamp)
         {
-            return Clients.All.InvokeAsync("Echo", timestamp);
+            return Clients.All.SendAsync("Echo", timestamp);
         }
     }
 }
