@@ -127,6 +127,8 @@ namespace BenchmarksDriver
                 "Duration of client job in seconds. Default is 15.", CommandOptionType.SingleValue);
             var warmupOption = app.Option("--warmup",
                 "Duration of warmup in seconds. Default is 15.", CommandOptionType.SingleValue);
+            var maxDurationOption = app.Option("--maxDuration",
+                "MaxDuration the test can run before being shutdown. Default is 20.", CommandOptionType.SingleValue);
             var headerOption = app.Option("--header",
                 "Header added to request.", CommandOptionType.MultipleValue);
             var headersOption = app.Option("--headers",
@@ -544,6 +546,10 @@ namespace BenchmarksDriver
                 if (durationOption.HasValue())
                 {
                     _clientJob.Duration = int.Parse(durationOption.Value());
+                }
+                if (maxDurationOption.HasValue())
+                {
+                    _clientJob.MaxDuration = int.Parse(maxDurationOption.Value());
                 }
                 if (warmupOption.HasValue())
                 {

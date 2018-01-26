@@ -106,8 +106,7 @@ namespace BenchmarkClient
 
                         Log($"Starting '{job.ClientName}' worker");
                         job.State = ClientState.Starting;
-
-                        try
+                        if (WorkerFactory.TryCreate(job, _httpClient, out worker, out var error) == false)
                         {
                             if (WorkerFactory.TryCreate(job, out worker, out var error) == false)
                             {
@@ -129,11 +128,12 @@ namespace BenchmarkClient
                         }
                         catch (Exception e)
                         {
-                            Log($"An unexpected error occured while starting the job {job.Id}");
-                            Log(e.Message);
+                            Debug.Assert(worker != null);
+                            Log($"Starting job {worker.JobLogText}");
 
-                            job.State = ClientState.Deleting;
-                            _jobs.Update(job);
+                            worker.Start();
+
+                            Log($"Running job {worker.JobLogText}");
                         }
                     }
                     else if (job.State == ClientState.Running || job.State == ClientState.Completed)
