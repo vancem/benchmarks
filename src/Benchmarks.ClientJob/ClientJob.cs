@@ -20,7 +20,7 @@ namespace Benchmarks.ClientJob
             Id = clientJob.Id;
             Connections = clientJob.Connections;
             Duration = clientJob.Duration;
-            WorkerProperties = clientJob.WorkerProperties;
+            ClientProperties = clientJob.ClientProperties;
             ClientName = clientJob.ClientName;
             Headers = clientJob.Headers;
             ServerBenchmarkUri = clientJob.ServerBenchmarkUri;
@@ -42,9 +42,7 @@ namespace Benchmarks.ClientJob
         public int Duration { get; set; } = 15;
         public int Warmup { get; set; } = 15;
 
-        public int MaxDuration { get; set; } = 20;
-
-        public Dictionary<string, object> WorkerProperties { get; set; } = new Dictionary<string, object>();
+        public Dictionary<string, string> ClientProperties { get; set; } = new Dictionary<string, string>();
 
         public Dictionary<string, string> Headers { get; set; } = new Dictionary<string, string>();
 

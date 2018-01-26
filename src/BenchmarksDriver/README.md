@@ -32,15 +32,14 @@ Options:
   --timeout              The max delay to wait to the job to run. Default is 00:05:00.
   --outputFile           Output file attachment. Format is 'path[;destination]'. FilePath can be a URL. e.g., "--outputFile c:\build\Microsoft.AspNetCore.Mvc.dll", "--outputFile c:\files\samples\picture.png;wwwroot\picture.png"
   --runtimeFile          Runtime file attachment. Format is 'path[;destination]', e.g., "--runtimeFile c:\build\System.Net.Security.dll"  
-  --clientThreads        Number of threads used by client. Default is 32.
+  --properties           Key value pairs of properties specific to the client running. e.g., "threads=16;connections=32;pipelinedepth=16"
+  --clientName           Name of client to use for testing, e.g. 'wrk'.
   --connections          Number of connections used by client. Default is 256.
   --duration             Duration of test in seconds. Default is 15.
   --warmup               Duration of warmup in seconds. Default is 15.
   --header               Header added to request.
   --headers              Default set of HTTP headers added to request (None, Plaintext, Json, Html). Default is Html.
   --method               HTTP method of the request. Default is GET.
-  --script               Name of the script used by wrk.
-  --pipelineDepth        Depth of pipeline used by client.
   --path                 Relative URL where the client should send requests.
   --querystring          Querystring to add to the requests. (e.g., "?page=1")
   -j|--jobs              The path or url to the jobs definition.

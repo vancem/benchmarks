@@ -5,8 +5,6 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
-using System.Reflection;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Benchmarks.ClientJob;
@@ -23,9 +21,6 @@ namespace BenchmarkClient
 {
     public class Startup
     {
-        private static HttpClient _httpClient;
-        private static HttpClientHandler _httpClientHandler;
-
         private const string _defaultUrl = "http://*:5002";
 
         private static readonly IRepository<ClientJob> _jobs = new InMemoryRepository<ClientJob>();
@@ -66,11 +61,6 @@ namespace BenchmarkClient
                 var url = urlOption.HasValue() ? urlOption.Value() : _defaultUrl;
                 return Run(url).Result;
             });
-
-            // Configuring the http client to trust the self-signed certificate
-            _httpClientHandler = new HttpClientHandler();
-            _httpClientHandler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
-            _httpClient = new HttpClient(_httpClientHandler);
 
             return app.Execute(args);
         }
@@ -115,29 +105,42 @@ namespace BenchmarkClient
                         // TODO: Race condition if DELETE is called during this code
 
                         Log($"Starting '{job.ClientName}' worker");
-
                         job.State = ClientState.Starting;
-                        if (WorkerFactory.TryCreate(job, _httpClient, out worker, out var error) == false)
+
+                        try
                         {
-                            Console.WriteLine(error);
-                            // Worker failed to start
-                            job.State = ClientState.Completed;
+                            if (WorkerFactory.TryCreate(job, out worker, out var error) == false)
+                            {
+                                Console.WriteLine(error);
+                                // Worker failed to start
+                                job.State = ClientState.Deleting;
+                            }
+                            else
+                            {
+                                Debug.Assert(worker != null);
+                                Log($"Starting job {worker.JobLogText}");
+
+                                await worker.StartAsync();
+
+                                Log($"Running job {worker.JobLogText}");
+                            }
+
+                            job.LastDriverCommunicationUtc = DateTime.UtcNow;
                         }
-                        else
+                        catch (Exception e)
                         {
-                            Debug.Assert(worker != null);
-                            Log($"Starting job {worker.JobLogText}");
+                            Log($"An unexpected error occured while starting the job {job.Id}");
+                            Log(e.Message);
 
-                            worker.Start();
-
-                            Log($"Running job {worker.JobLogText}");
+                            job.State = ClientState.Deleting;
+                            _jobs.Update(job);
                         }
                     }
                     else if (job.State == ClientState.Running || job.State == ClientState.Completed)
                     {
                         var now = DateTime.UtcNow;
 
-                        if (now - job.LastDriverCommunicationUtc > TimeSpan.FromSeconds(job.MaxDuration))
+                        if (now - job.LastDriverCommunicationUtc > TimeSpan.FromSeconds(30))
                         {
                             Log($"Driver didn't communicate for {now - job.LastDriverCommunicationUtc}. Halting job.");
                             job.State = ClientState.Deleting;
@@ -151,10 +154,7 @@ namespace BenchmarkClient
 
                         try
                         {
-                            if (process != null && !process.HasExited)
-                            {
-                                process.Kill();
-                            }
+                            await worker.StopAsync();
                         }
                         finally
                         {

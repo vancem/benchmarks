@@ -121,26 +121,20 @@ namespace BenchmarksDriver
             // ClientJob Options
             var clientNameOption = app.Option("--clientName",
                 "Name of client to use for testing, e.g. 'wrk'.", CommandOptionType.SingleValue);
-            var clientThreadsOption = app.Option("--clientThreads",
-                "Number of threads used by client. Default is 32.", CommandOptionType.SingleValue);
             var connectionsOption = app.Option("--connections",
                 "Number of connections used by client. Default is 256.", CommandOptionType.SingleValue);
             var durationOption = app.Option("--duration",
                 "Duration of client job in seconds. Default is 15.", CommandOptionType.SingleValue);
             var warmupOption = app.Option("--warmup",
                 "Duration of warmup in seconds. Default is 15.", CommandOptionType.SingleValue);
-            var maxDurationOption = app.Option("--maxDuration",
-                "MaxDuration the test can run before being shutdown. Default is 20.", CommandOptionType.SingleValue);
             var headerOption = app.Option("--header",
                 "Header added to request.", CommandOptionType.MultipleValue);
             var headersOption = app.Option("--headers",
                 "Default set of HTTP headers added to request (None, Plaintext, Json, Html). Default is Html.", CommandOptionType.SingleValue);
             var methodOption = app.Option("--method",
                 "HTTP method of the request. Default is GET.", CommandOptionType.SingleValue);
-            var scriptNameOption = app.Option("--script",
-                "Name of the script used by wrk.", CommandOptionType.SingleValue);
-            var pipelineDepthOption = app.Option("--pipelineDepth",
-                "Depth of pipeline used by client.", CommandOptionType.SingleValue);
+            var clientProperties = app.Option("--properties",
+                "Key value pairs of properties specific to the client running. e.g., threads=16;connections=32;pipelinedepth=16", CommandOptionType.SingleValue);
             var pathOption = app.Option(
                 "--path",
                 "Relative URL where the client should send requests.",
@@ -547,35 +541,22 @@ namespace BenchmarksDriver
                 {
                     _clientJob.Connections = int.Parse(connectionsOption.Value());
                 }
-                if (clientThreadsOption.HasValue())
-                {
-                    _clientJob.WorkerProperties.Add("Threads", int.Parse(clientThreadsOption.Value()));
-                }
                 if (durationOption.HasValue())
                 {
                     _clientJob.Duration = int.Parse(durationOption.Value());
-                }
-                if (maxDurationOption.HasValue())
-                {
-                    _clientJob.MaxDuration = int.Parse(maxDurationOption.Value());
                 }
                 if (warmupOption.HasValue())
                 {
                     _clientJob.Warmup = int.Parse(warmupOption.Value());
                 }
-                if (pipelineDepthOption.HasValue())
+                if (clientProperties.HasValue())
                 {
-                    var pipelineDepth = int.Parse(pipelineDepthOption.Value());
-                    _clientJob.WorkerProperties.Add("PipelineDepth", int.Parse(pipelineDepthOption.Value()));
-
-                    if (pipelineDepth > 0)
+                    var properties = clientProperties.Value().Split(';');
+                    foreach (var kvp in properties)
                     {
-                        _clientJob.WorkerProperties.Add("ScriptName", "pipeline");
+                        var values = kvp.Split('=');
+                        _clientJob.ClientProperties[values[0]] = values[1];
                     }
-                }
-                if (scriptNameOption.HasValue())
-                {
-                    _clientJob.WorkerProperties.Add("ScriptName", scriptNameOption.Value());
                 }
                 if (methodOption.HasValue())
                 {
@@ -1307,10 +1288,9 @@ namespace BenchmarksDriver
                         connectionFilter: serverJob.ConnectionFilter,
                         webHost: serverJob.WebHost,
                         kestrelThreadCount: serverJob.KestrelThreadCount,
-                        clientThreads: clientJob.WorkerProperties["Threads"] as int?,
+                        clientProperties: clientJob.ClientProperties,
                         connections: clientJob.Connections,
                         duration: clientJob.Duration,
-                        pipelineDepth: clientJob.WorkerProperties["PipelineDepth"] as int?,
                         path: path,
                         method: clientJob.Method,
                         headers: clientJob.Headers,
@@ -1333,10 +1313,9 @@ namespace BenchmarksDriver
             string connectionFilter,
             WebHost webHost,
             int? kestrelThreadCount,
-            int? clientThreads,
+            Dictionary<string, string> clientProperties,
             int connections,
             int duration,
-            int? pipelineDepth,
             string path,
             string method,
             IDictionary<string, string> headers,
@@ -1367,10 +1346,9 @@ namespace BenchmarksDriver
                         [ConnectionFilter] [nvarchar](50) NULL,
                         [WebHost] [nvarchar](50) NOT NULL,
                         [KestrelThreadCount] [int] NULL,
-                        [ClientThreads] [int] NULL,
+                        [ClientProperties] [nvarchar](max) NULL,
                         [Connections] [int] NOT NULL,
                         [Duration] [int] NOT NULL,
-                        [PipelineDepth] [int] NULL,
                         [Path] [nvarchar](200) NULL,
                         [Method] [nvarchar](50) NOT NULL,
                         [Headers] [nvarchar](max) NULL,
@@ -1399,10 +1377,9 @@ namespace BenchmarksDriver
                            ,[ConnectionFilter]
                            ,[WebHost]
                            ,[KestrelThreadCount]
-                           ,[ClientThreads]
+                           ,[ClientProperties]
                            ,[Connections]
                            ,[Duration]
-                           ,[PipelineDepth]
                            ,[Path]
                            ,[Method]
                            ,[Headers]
@@ -1425,10 +1402,9 @@ namespace BenchmarksDriver
                            ,@ConnectionFilter
                            ,@WebHost
                            ,@KestrelThreadCount
-                           ,@ClientThreads
+                           ,@ClientProperties
                            ,@Connections
                            ,@Duration
-                           ,@PipelineDepth
                            ,@Path
                            ,@Method
                            ,@Headers
@@ -1443,6 +1419,12 @@ namespace BenchmarksDriver
                 using (var command = new SqlCommand(createCmd, connection))
                 {
                     await command.ExecuteNonQueryAsync();
+                }
+
+                string csv = string.Empty;
+                foreach (var item in clientProperties)
+                {
+                    csv += $"{item.Key}={item.Value},";
                 }
 
                 using (var command = new SqlCommand(insertCmd, connection))
@@ -1465,10 +1447,9 @@ namespace BenchmarksDriver
                         string.IsNullOrEmpty(connectionFilter) ? (object)DBNull.Value : connectionFilter);
                     p.AddWithValue("@WebHost", webHost.ToString());
                     p.AddWithValue("@KestrelThreadCount", (object)kestrelThreadCount ?? DBNull.Value);
-                    p.AddWithValue("@ClientThreads", (object)clientThreads ?? DBNull.Value);
+                    p.AddWithValue("@ClientProperties", csv);
                     p.AddWithValue("@Connections", connections);
                     p.AddWithValue("@Duration", duration);
-                    p.AddWithValue("@PipelineDepth", (object)pipelineDepth ?? DBNull.Value);
                     p.AddWithValue("@Path", string.IsNullOrEmpty(path) ? (object)DBNull.Value : path);
                     p.AddWithValue("@Method", method.ToString().ToUpperInvariant());
                     p.AddWithValue("@Headers", headers.Any() ? JsonConvert.SerializeObject(headers) : (object)DBNull.Value);

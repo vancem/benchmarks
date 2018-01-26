@@ -22,26 +22,30 @@ namespace BenchmarksClient.Workers
 
         public string JobLogText { get; set; }
 
-        public WrkWorker(ClientJob clientJob, HttpClient httpClient)
+        public WrkWorker(ClientJob clientJob)
         {
             _job = clientJob;
-            _httpClient = httpClient;
 
-            _job.WorkerProperties.TryGetValue("ScriptName", out var scriptName);
-            if (_job.WorkerProperties.TryGetValue("PipelineDepth", out var pipelineDepth))
+            // Configuring the http client to trust the self-signed certificate
+            var httpClientHandler = new HttpClientHandler();
+            httpClientHandler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+            _httpClient = new HttpClient(httpClientHandler);
+
+            _job.ClientProperties.TryGetValue("ScriptName", out var scriptName);
+            if (_job.ClientProperties.TryGetValue("PipelineDepth", out var pipelineDepth))
             {
-                Debug.Assert((int)pipelineDepth <= 0 || scriptName != null, "A script name must be present when the pipeline depth is larger than 0.");
+                Debug.Assert(int.Parse(pipelineDepth) <= 0 || scriptName != null, "A script name must be present when the pipeline depth is larger than 0.");
             }
 
             var jobLogText =
-                        $"[ID:{_job.Id} Connections:{_job.Connections} Threads:{_job.WorkerProperties["Threads"]} Duration:{_job.Duration} Method:{_job.Method} ServerUrl:{_job.ServerBenchmarkUri}";
+                        $"[ID:{_job.Id} Connections:{_job.Connections} Threads:{_job.ClientProperties["Threads"]} Duration:{_job.Duration} Method:{_job.Method} ServerUrl:{_job.ServerBenchmarkUri}";
 
             if (!string.IsNullOrEmpty(scriptName as string))
             {
                 jobLogText += $" Script:{scriptName}";
             }
 
-            if (pipelineDepth != null && (int)pipelineDepth > 0)
+            if (pipelineDepth != null && int.Parse(pipelineDepth) > 0)
             {
                 jobLogText += $" Pipeline:{pipelineDepth}";
             }
@@ -55,41 +59,42 @@ namespace BenchmarksClient.Workers
             JobLogText = jobLogText;
         }
 
-        public void Start()
+        public async Task StartAsync()
         {
-            MeasureFirstRequestLatency(_job);
+            await MeasureFirstRequestLatency(_job);
 
             _job.State = ClientState.Running;
-            _job.RunningSince = DateTime.UtcNow;
+            _job.LastDriverCommunicationUtc = DateTime.UtcNow;
 
             _process = StartProcess(_job);
         }
 
-        public void Stop()
+        public Task StopAsync()
         {
-            _process.WaitForExit();
-        }
-
-        public void Dispose()
-        {
-            if (!_process.HasExited)
+            if (_process != null && !_process.HasExited)
             {
                 _process.Kill();
             }
 
-            _process.Dispose();
+            return Task.CompletedTask;
         }
 
-        private void MeasureFirstRequestLatency(ClientJob job)
+        public void Dispose()
+        {
+            _process.Dispose();
+            _httpClient.Dispose();
+        }
+
+        private async Task MeasureFirstRequestLatency(ClientJob job)
         {
             Startup.Log("Measuring startup time");
 
             var stopwatch = new Stopwatch();
             stopwatch.Start();
 
-            using (var response = _httpClient.SendAsync(CreateHttpMessage(job)).GetAwaiter().GetResult())
+            using (var response = await _httpClient.SendAsync(CreateHttpMessage(job)))
             {
-                var responseContent = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                var responseContent = await response.Content.ReadAsStringAsync();
                 job.LatencyFirstRequest = stopwatch.Elapsed;
             }
 
@@ -101,9 +106,9 @@ namespace BenchmarksClient.Workers
             {
                 stopwatch.Restart();
 
-                using (var response = _httpClient.SendAsync(CreateHttpMessage(job)).GetAwaiter().GetResult())
+                using (var response = await _httpClient.SendAsync(CreateHttpMessage(job)))
                 {
-                    var responseContent = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                    var responseContent = await response.Content.ReadAsStringAsync();
 
                     // We keep the last measure to simulate a warmup phase.
                     job.LatencyNoLoad = stopwatch.Elapsed;
@@ -139,16 +144,16 @@ namespace BenchmarksClient.Workers
                 }
             }
 
-            command += $" --latency -d {job.Duration} -c {job.Connections} --timeout 8 -t {job.WorkerProperties["Threads"]}  {job.ServerBenchmarkUri}{job.Query}";
+            command += $" --latency -d {job.Duration} -c {job.Connections} --timeout 8 -t {job.ClientProperties["Threads"]}  {job.ServerBenchmarkUri}{job.Query}";
 
-            if (job.WorkerProperties.TryGetValue("ScriptName", out var scriptName))
+            if (job.ClientProperties.TryGetValue("ScriptName", out var scriptName))
             {
-                if (!string.IsNullOrEmpty((string)scriptName))
+                if (!string.IsNullOrEmpty(scriptName))
                 {
                     command += $" -s scripts/{scriptName}.lua --";
 
-                    var pipeLineDepth = (int?)job.WorkerProperties["PipelineDepth"];
-                    if (pipeLineDepth != null && pipeLineDepth > 0)
+                    var pipeLineDepth = int.Parse(job.ClientProperties["PipelineDepth"]);
+                    if (pipeLineDepth > 0)
                     {
                         command += $" {pipeLineDepth}";
                     }
@@ -215,7 +220,7 @@ namespace BenchmarksClient.Workers
                 var badResponsesMatch = Regex.Match(job.Output, @"Non-2xx or 3xx responses: ([\d\.]*)");
                 job.BadResponses = ReadBadReponses(badResponsesMatch);
 
-                var requestsCountMatch = Regex.Match(job.Output, @"([\d\.]*) requests in ([\d\.]*)s");
+                var requestsCountMatch = Regex.Match(job.Output, @"([\d\.]*) requests in ([\d\.]*)(s|m|h)");
                 job.Requests = ReadRequests(requestsCountMatch);
                 job.ActualDuration = ReadDuration(requestsCountMatch);
 
@@ -237,7 +242,17 @@ namespace BenchmarksClient.Workers
             }
 
             var value = double.Parse(responseCountMatch.Groups[2].Value);
-            return TimeSpan.FromSeconds(value);
+
+            var unit = responseCountMatch.Groups[3].Value;
+
+            switch (unit)
+            {
+                case "s": return TimeSpan.FromSeconds(value);
+                case "m": return TimeSpan.FromMinutes(value);
+                case "h": return TimeSpan.FromHours(value);
+
+                default: throw new NotSupportedException("Failed to parse duration unit: " + unit);
+            }
         }
 
         private static int ReadRequests(Match responseCountMatch)
@@ -248,6 +263,7 @@ namespace BenchmarksClient.Workers
             }
 
             var value = int.Parse(responseCountMatch.Groups[1].Value);
+
             return value;
         }
 
@@ -263,7 +279,7 @@ namespace BenchmarksClient.Workers
             return value;
         }
 
-        private static TimeSpan ReadLatency(Match match)
+        private static double ReadLatency(Match match)
         {
             if (!match.Success || match.Groups.Count != 3)
             {
@@ -275,9 +291,9 @@ namespace BenchmarksClient.Workers
 
             switch (unit)
             {
-                case "s": return TimeSpan.FromSeconds(value);
-                case "ms": return TimeSpan.FromMilliseconds(value);
-                case "us": return TimeSpan.FromTicks((long)value * 10); // 1 Tick == 100ns == 0.1us
+                case "s": return value * 1000;
+                case "ms": return value;
+                case "us": return value / 1000;
 
                 default: throw new NotSupportedException("Failed to parse latency unit: " + unit);
             }

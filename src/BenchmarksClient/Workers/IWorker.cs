@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Threading.Tasks;
 
 namespace BenchmarksClient.Workers
 {
@@ -9,7 +10,7 @@ namespace BenchmarksClient.Workers
     {
         string JobLogText { get; set; }
 
-        void Start();
-        void Stop();
+        Task StartAsync();
+        Task StopAsync();
     }
 }

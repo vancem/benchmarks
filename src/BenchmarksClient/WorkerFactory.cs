@@ -9,7 +9,7 @@ namespace BenchmarksClient
 {
     static public class WorkerFactory
     {
-        static public bool TryCreate(ClientJob clientJob, HttpClient httpClient, out IWorker worker, out string errors)
+        static public bool TryCreate(ClientJob clientJob, out IWorker worker, out string errors)
         {
             errors = null;
             worker = null;
@@ -17,7 +17,7 @@ namespace BenchmarksClient
             switch (clientJob.ClientName)
             {
                 case "wrk":
-                    worker = new WrkWorker(clientJob, httpClient);
+                    worker = new WrkWorker(clientJob);
                     return true;
                 default:
                     errors = $"'{clientJob.ClientName}' is not a valid worker";
