@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Benchmarks.Configuration;
 using Microsoft.Extensions.Options;
+using Peregrine.Ado;
 
 namespace Benchmarks.Data
 {
@@ -148,25 +149,28 @@ namespace Benchmarks.Data
             var result = new List<Fortune>();
 
             using (var db = _dbProviderFactory.CreateConnection())
-            using (var cmd = db.CreateCommand())
             {
-                cmd.CommandText = "SELECT id, message FROM fortune";
-
                 db.ConnectionString = _connectionString;
+
                 await db.OpenAsync();
 
-                // Prepared statements improve PostgreSQL performance by 10-15%
-                cmd.Prepare();
-
-                using (var rdr = await cmd.ExecuteReaderAsync(CommandBehavior.CloseConnection))
+                using (var cmd = (PeregrineCommand)db.CreateCommand())
                 {
-                    while (await rdr.ReadAsync())
+                    cmd.CommandText = "SELECT id, message FROM fortune";
+                    
+                    // Prepared statements improve PostgreSQL performance by 10-15%
+                    await cmd.PrepareAsync();
+
+                    using (var rdr = await cmd.ExecuteReaderAsync(CommandBehavior.CloseConnection))
                     {
-                        result.Add(new Fortune
+                        while (await rdr.ReadAsync())
                         {
-                            Id = rdr.GetInt32(0),
-                            Message = rdr.GetString(1)
-                        });
+                            result.Add(new Fortune
+                            {
+                                Id = rdr.GetInt32(0),
+                                Message = rdr.GetString(1)
+                            });
+                        }
                     }
                 }
             }

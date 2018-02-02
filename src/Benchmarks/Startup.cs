@@ -16,6 +16,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using Npgsql;
+using Peregrine.Ado;
 
 namespace Benchmarks
 {
@@ -63,7 +64,7 @@ namespace Benchmarks
 
                     if (Scenarios.Any("Raw") || Scenarios.Any("Dapper"))
                     {
-                        services.AddSingleton<DbProviderFactory>(NpgsqlFactory.Instance);
+                        services.AddSingleton<DbProviderFactory>(PeregrineFactory.Instance);
                     }
                     break;
 
