@@ -86,11 +86,11 @@ namespace Peregrine.Ado
                     .ToDictionary(p => p[0], p => p[1]);
 
                 _session = new PGSession(
-                    parts["host"],
+                    parts["Server"],
                     port: 5432,
-                    database: parts["database"],
-                    user: parts["username"],
-                    password: parts["password"]);
+                    database: parts["Database"],
+                    user: parts["User Id"],
+                    password: parts["Password"]);
             }
 
             return _session.IsConnected ? Task.CompletedTask : _session.StartAsync();
