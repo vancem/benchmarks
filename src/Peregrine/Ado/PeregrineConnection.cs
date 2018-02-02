@@ -73,7 +73,7 @@ namespace Peregrine.Ado
                 return Task.CompletedTask;
             }
 
-            var pool = _pools.GetOrAdd(ConnectionString, _ => new Pool(256));
+            var pool = _pools.GetOrAdd(ConnectionString, _ => new Pool(1024));
 
             _session = pool.Rent();
 
