@@ -50,8 +50,7 @@ namespace Peregrine.Ado
             }
         }
 
-        private static readonly ConcurrentDictionary<string, Pool> _pools
-            = new ConcurrentDictionary<string, Pool>();
+        private static readonly Pool _pool = new Pool(1024);
 
         private PGSession _session;
 
@@ -73,9 +72,7 @@ namespace Peregrine.Ado
                 return Task.CompletedTask;
             }
 
-            var pool = _pools.GetOrAdd(ConnectionString, _ => new Pool(1024));
-
-            _session = pool.Rent();
+            _session = _pool.Rent();
 
             if (_session == null)
             {
@@ -108,7 +105,7 @@ namespace Peregrine.Ado
         {
             if (_session != null)
             {
-                _pools[ConnectionString].Return(_session);
+                _pool.Return(_session);
             }
 
             _disposed = true;
