@@ -105,8 +105,7 @@ namespace BenchmarkClient
                         // TODO: Race condition if DELETE is called during this code
 
                         Log($"Starting '{job.ClientName}' worker");
-                        job.State = ClientState.Starting;
-                        if (WorkerFactory.TryCreate(job, _httpClient, out worker, out var error) == false)
+                        try
                         {
                             if (WorkerFactory.TryCreate(job, out worker, out var error) == false)
                             {
@@ -128,12 +127,11 @@ namespace BenchmarkClient
                         }
                         catch (Exception e)
                         {
-                            Debug.Assert(worker != null);
-                            Log($"Starting job {worker.JobLogText}");
+                            Log($"An unexpected error occured while starting the job {job.Id}");
+                            Log(e.Message);
 
-                            worker.Start();
-
-                            Log($"Running job {worker.JobLogText}");
+                            job.State = ClientState.Deleting;
+                            _jobs.Update(job);
                         }
                     }
                     else if (job.State == ClientState.Running || job.State == ClientState.Completed)
