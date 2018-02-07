@@ -34,6 +34,7 @@ Options:
   --runtimeFile          Runtime file attachment. Format is 'path[;destination]', e.g., "--runtimeFile c:\build\System.Net.Security.dll"  
   --properties           Key value pairs of properties specific to the client running. e.g., "Threads=16;PipelineDepth=16"
   --clientName           Name of client to use for testing, e.g. 'wrk'.
+  --clientName           Name of client to use for testing, e.g. 'wrk'.
   --connections          Number of connections used by client. Default is 256.
   --duration             Duration of test in seconds. Default is 15.
   --warmup               Duration of warmup in seconds. Default is 15.
