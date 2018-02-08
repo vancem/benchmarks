@@ -128,7 +128,7 @@ namespace BenchmarkClient
                         catch (Exception e)
                         {
                             Log($"An unexpected error occured while starting the job {job.Id}");
-                            Log(e.Message);
+                            Log(e.ToString());
 
                             job.State = ClientState.Deleting;
                             _jobs.Update(job);
@@ -147,8 +147,7 @@ namespace BenchmarkClient
                     }
                     else if (job.State == ClientState.Deleting)
                     {
-                        Debug.Assert(worker != null);
-                        Log($"Deleting job {worker.JobLogText}");
+                        Log($"Deleting job {worker?.JobLogText ?? job.Id.ToString()}");
 
                         try
                         {

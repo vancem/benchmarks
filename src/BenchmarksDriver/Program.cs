@@ -145,8 +145,6 @@ namespace BenchmarksDriver
                 CommandOptionType.SingleValue);
             var jobsOptions = app.Option("-j|--jobs",
                 "The path or url to the jobs definition.", CommandOptionType.SingleValue);
-            var transportOption = app.Option("-t|--transport",
-                "The SignalR Transport to use for the client(s).", CommandOptionType.SingleValue);
 
             app.OnExecute(() =>
             {
@@ -567,10 +565,6 @@ namespace BenchmarksDriver
                 if (querystringOption.HasValue())
                 {
                     _clientJob.Query = querystringOption.Value();
-                }
-                if (transportOption.HasValue())
-                {
-                    _clientJob.WorkerProperties["TransportType"] = transportOption.Value();
                 }
 
                 switch (headers)

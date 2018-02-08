@@ -6,7 +6,7 @@
       "Project": "src/Benchmarks/Benchmarks.csproj"
     }
   },
-  "SignalR": {
-    "Path": "/json"
+  "SignalRBroadcast": {
+    "Path": "/signalr/broadcast"
   }
 }
