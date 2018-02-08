@@ -154,6 +154,11 @@ namespace Benchmarks
             {
                 services.AddResponseCaching();
             }
+
+            if (Scenarios.Any("SignalR"))
+            {
+                services.AddSignalR();
+            }
         }
 
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
@@ -295,6 +300,11 @@ namespace Benchmarks
             if (Scenarios.ResponseCachingPlaintextVaryByCached)
             {
                 app.UseResponseCachingPlaintextVaryByCached();
+            }
+
+            if (Scenarios.SignalRBroadcast)
+            {
+                app.UseSignalRMiddleware();
             }
 
             app.RunDebugInfoPage();
