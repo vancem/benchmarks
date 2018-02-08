@@ -1,7 +1,9 @@
-﻿using System;
+﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using BenchmarkClient;
@@ -14,7 +16,7 @@ namespace BenchmarksClient.Workers
 {
     public class SignalRWorker : IWorker
     {
-        public string JobLogText { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public string JobLogText { get; set; }
 
         private ClientJob _job;
         private HttpClientHandler _httpClientHandler;
@@ -63,8 +65,9 @@ namespace BenchmarksClient.Workers
                 tasks.Add(connection.StartAsync());
             }
 
-            _job.State = ClientState.Running;
             await Task.WhenAll(tasks);
+
+            _job.State = ClientState.Running;
 
             // This should last until StopAsync is called
             _sendTask = _connections[0].SendAsync("Echo");
