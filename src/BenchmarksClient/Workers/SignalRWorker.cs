@@ -21,7 +21,6 @@ namespace BenchmarksClient.Workers
         private ClientJob _job;
         private HttpClientHandler _httpClientHandler;
         private List<HubConnection> _connections;
-        private Task _sendTask;
 
         public SignalRWorker(ClientJob job)
         {
@@ -69,8 +68,8 @@ namespace BenchmarksClient.Workers
 
             _job.State = ClientState.Running;
 
-            // This should last until StopAsync is called
-            _sendTask = _connections[0].SendAsync("Echo");
+            // SendAsync will return as soon as the request has been sent (non-blocking)
+            await _connections[0].SendAsync("Echo");
         }
 
         public async Task StopAsync()
@@ -83,11 +82,6 @@ namespace BenchmarksClient.Workers
             }
 
             await Task.WhenAll(tasks);
-
-            if (await Task.WhenAny(_sendTask, Task.Delay(1000)) != _sendTask)
-            {
-                Startup.Log("SendTask didn't finish in a reasonable time");
-            }
         }
 
         public void Dispose()
@@ -112,15 +106,40 @@ namespace BenchmarksClient.Workers
                 .WithMessageHandler(_httpClientHandler)
                 .WithTransport(transportType);
 
+            if (_job.WorkerProperties.TryGetValue("HubProtocol", out var protocolName))
+            {
+                switch (protocolName)
+                {
+                    case "messagepack":
+                        hubConnectionBuilder.WithMessagePackProtocol();
+                        break;
+                    case "json":
+                        hubConnectionBuilder.WithJsonProtocol();
+                        break;
+                    default:
+                        throw new Exception($"{protocolName} is an invalid hub protocol name.");
+                }
+            }
+            else
+            {
+                hubConnectionBuilder.WithJsonProtocol();
+            }
+
+            foreach (var header in _job.Headers)
+            {
+                hubConnectionBuilder.WithHeader(header.Key, header.Value);
+            }
+
             for (var i = 0; i < _job.Connections; i++)
             {
                 var connection = hubConnectionBuilder.Build();
                 _connections.Add(connection);
 
                 // setup event handlers
-                connection.On("echo", () =>
+                connection.On<DateTime>("echo", utcNow =>
                 {
                     // TODO: Collect all the things
+                    // DateTime.UtcNow - utcNow for latency
                 });
             }
         }

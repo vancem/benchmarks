@@ -19,6 +19,9 @@ namespace BenchmarksClient
                 case "wrk":
                     worker = new WrkWorker(clientJob);
                     return true;
+                case "signalr":
+                    worker = new SignalRWorker(clientJob);
+                    return true;
                 default:
                     errors = $"'{clientJob.ClientName}' is not a valid worker";
                     return false;

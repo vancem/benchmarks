@@ -41,7 +41,7 @@ namespace Benchmarks.Middleware
         {
             while (ConnectionCount > 0)
             {
-                await Clients.All.SendAsync("echo");
+                await Clients.All.SendAsync("echo", DateTime.UtcNow);
             }
         }
     }

@@ -1,0 +1,12 @@
+{
+  "Default": {
+    "Source": {
+      "Repository": "https://github.com/aspnet/benchmarks.git",
+      "BranchOrCommit": "dev",
+      "Project": "src/Benchmarks/Benchmarks.csproj"
+    }
+  },
+  "SignalR": {
+    "Path": "/json"
+  }
+}
