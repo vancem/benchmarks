@@ -92,6 +92,9 @@ namespace BenchmarksClient.Workers
         {
             _job.RequestsPerSecond = (float)req / _job.Duration;
             Startup.Log(_job.RequestsPerSecond.ToString());
+
+            await _connections[0].SendAsync("Stop");
+
             // stop connections
             var tasks = new List<Task>(_connections.Count);
             foreach (var connection in _connections)

@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Benchmarks.Configuration;
 using Microsoft.AspNetCore.Builder;
@@ -23,28 +22,32 @@ namespace Benchmarks.Middleware
 
     public class EchoHub : Hub
     {
-        static int ConnectionCount;
+        static bool Running;
 
         public override Task OnConnectedAsync()
         {
-            Interlocked.Increment(ref ConnectionCount);
             return Task.CompletedTask;
         }
 
         public override Task OnDisconnectedAsync(Exception exception)
         {
-            Console.WriteLine("OnDisconnected called");
-            Interlocked.Decrement(ref ConnectionCount);
             return Task.CompletedTask;
         }
 
         public async Task Echo(long timestamp)
         {
-            while (ConnectionCount > 0)
+            Running = true;
+            while (Running)
             {
                 await Clients.All.SendAsync("echo", DateTime.UtcNow);
             }
             Console.WriteLine("Echo exited");
+        }
+
+        public Task Stop()
+        {
+            Running = false;
+            return Task.CompletedTask;
         }
     }
 }
