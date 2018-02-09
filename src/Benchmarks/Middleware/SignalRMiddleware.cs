@@ -33,6 +33,7 @@ namespace Benchmarks.Middleware
 
         public override Task OnDisconnectedAsync(Exception exception)
         {
+            Console.WriteLine("OnDisconnected called");
             Interlocked.Decrement(ref ConnectionCount);
             return Task.CompletedTask;
         }
