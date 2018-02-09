@@ -2,7 +2,7 @@
   "Default": {
     "Source": {
       "Repository": "https://github.com/aspnet/benchmarks.git",
-      "BranchOrCommit": "dev",
+      "BranchOrCommit": "brecon/signalRClient",
       "Project": "src/Benchmarks/Benchmarks.csproj"
     }
   },

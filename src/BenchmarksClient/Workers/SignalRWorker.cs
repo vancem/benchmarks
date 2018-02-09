@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using BenchmarkClient;
 using Benchmarks.ClientJob;
@@ -21,6 +22,8 @@ namespace BenchmarksClient.Workers
         private ClientJob _job;
         private HttpClientHandler _httpClientHandler;
         private List<HubConnection> _connections;
+        private Timer _timer;
+        private int req;
 
         public SignalRWorker(ClientJob job)
         {
@@ -69,11 +72,26 @@ namespace BenchmarksClient.Workers
             _job.State = ClientState.Running;
 
             // SendAsync will return as soon as the request has been sent (non-blocking)
-            await _connections[0].SendAsync("Echo");
+            await _connections[0].SendAsync("Echo", 0);
+            _timer = new Timer(tt, null, TimeSpan.FromSeconds(_job.Duration), Timeout.InfiniteTimeSpan);
+        }
+
+        private void tt(object t)
+        {
+            try
+            {
+                StopAsync().GetAwaiter().GetResult();
+            }
+            finally
+            {
+                _job.State = ClientState.Completed;
+            }
         }
 
         public async Task StopAsync()
         {
+            _job.RequestsPerSecond = (float)req / _job.Duration;
+            Startup.Log(_job.RequestsPerSecond.ToString());
             // stop connections
             var tasks = new List<Task>(_connections.Count);
             foreach (var connection in _connections)
@@ -82,6 +100,11 @@ namespace BenchmarksClient.Workers
             }
 
             await Task.WhenAll(tasks);
+
+            _timer?.Dispose();
+            _timer = null;
+
+            Startup.Log("Stopped worker");
         }
 
         public void Dispose()
@@ -139,6 +162,7 @@ namespace BenchmarksClient.Workers
                 connection.On<DateTime>("echo", utcNow =>
                 {
                     // TODO: Collect all the things
+                    Interlocked.Increment(ref req);
                     // DateTime.UtcNow - utcNow for latency
                 });
             }
