@@ -43,6 +43,7 @@ namespace Benchmarks.Middleware
             {
                 await Clients.All.SendAsync("echo", DateTime.UtcNow);
             }
+            Console.WriteLine("Echo exited");
         }
     }
 }
