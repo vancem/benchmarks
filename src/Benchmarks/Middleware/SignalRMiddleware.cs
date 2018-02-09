@@ -46,6 +46,7 @@ namespace Benchmarks.Middleware
 
         public Task Stop()
         {
+            Console.WriteLine("Stop called");
             Running = false;
             return Task.CompletedTask;
         }
