@@ -37,17 +37,23 @@ namespace Benchmarks.Middleware
         public async Task Echo(long timestamp)
         {
             Running = true;
+            int i = 0;
             while (Running)
             {
                 await Clients.All.SendAsync("echo", DateTime.UtcNow);
+                i++;
+                if (i % 100000 == 0)
+                {
+                    await Task.Delay(1);
+                }
             }
             Console.WriteLine("Echo exited");
         }
 
         public Task Stop()
         {
-            Console.WriteLine("Stop called");
             Running = false;
+            Console.WriteLine("Stop called");
             return Task.CompletedTask;
         }
     }
