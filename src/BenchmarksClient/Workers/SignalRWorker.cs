@@ -76,11 +76,12 @@ namespace BenchmarksClient.Workers
             _timer = new Timer(tt, null, TimeSpan.FromSeconds(_job.Duration), Timeout.InfiniteTimeSpan);
         }
 
-        private void tt(object t)
+        private async void tt(object t)
         {
             try
             {
-                StopAsync().GetAwaiter().GetResult();
+                _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                await StopAsync();
             }
             finally
             {
@@ -90,24 +91,27 @@ namespace BenchmarksClient.Workers
 
         public async Task StopAsync()
         {
-            _job.RequestsPerSecond = (float)req / _job.Duration;
-            Startup.Log(_job.RequestsPerSecond.ToString());
-
-            await _connections[0].SendAsync("Stop");
-
-            // stop connections
-            var tasks = new List<Task>(_connections.Count);
-            foreach (var connection in _connections)
+            if (_timer != null)
             {
-                tasks.Add(connection.StopAsync());
+                _job.RequestsPerSecond = (float)req / _job.Duration;
+                Startup.Log(_job.RequestsPerSecond.ToString());
+
+                await _connections[0].SendAsync("Stop");
+
+                // stop connections
+                var tasks = new List<Task>(_connections.Count);
+                foreach (var connection in _connections)
+                {
+                    tasks.Add(connection.StopAsync());
+                }
+
+                await Task.WhenAll(tasks);
+
+                _timer?.Dispose();
+                _timer = null;
+
+                Startup.Log("Stopped worker");
             }
-
-            await Task.WhenAll(tasks);
-
-            _timer?.Dispose();
-            _timer = null;
-
-            Startup.Log("Stopped worker");
         }
 
         public void Dispose()
