@@ -102,8 +102,7 @@ namespace BenchmarksClient.Workers
                     callback.Dispose();
                 }
 
-                await _connections[0].SendAsync("Stop");
-                await Task.Delay(500);
+                await _connections[0].InvokeAsync("Stop");
 
                 // stop connections
                 var tasks = new List<Task>(_connections.Count);
