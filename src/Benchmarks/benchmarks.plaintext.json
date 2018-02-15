@@ -22,9 +22,7 @@
     "Properties": {
         "ScriptName": "",
         "PipelineDepth": 0
-    },
-    "ScriptName": "",
-    "PipelineDepth": 0
+    }
   },
   "CopyToAsync": {
     "Path": "/copytoasync",

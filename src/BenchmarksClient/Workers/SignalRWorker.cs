@@ -38,7 +38,7 @@ namespace BenchmarksClient.Workers
             };
 
             var jobLogText =
-                        $"[ID:{_job.Id} Connections:{_job.Connections} Duration:{_job.Duration} Method:{_job.Method} ServerUrl:{_job.ServerBenchmarkUri}";
+                $"[ID:{_job.Id} Connections:{_job.Connections} Duration:{_job.Duration} Method:{_job.Method} ServerUrl:{_job.ServerBenchmarkUri}";
 
             if (_job.Headers != null)
             {
@@ -48,7 +48,7 @@ namespace BenchmarksClient.Workers
             TransportType transportType = default;
             if (_job.ClientProperties.TryGetValue("TransportType", out var transport))
             {
-                transportType = Enum.Parse<TransportType>((string)transport);
+                transportType = Enum.Parse<TransportType>(transport);
                 jobLogText += $" TransportType:{transportType}";
             }
 
@@ -97,6 +97,7 @@ namespace BenchmarksClient.Workers
                 Startup.Log(_job.RequestsPerSecond.ToString());
 
                 await _connections[0].SendAsync("Stop");
+                await Task.Delay(1000);
 
                 // stop connections
                 var tasks = new List<Task>(_connections.Count);
