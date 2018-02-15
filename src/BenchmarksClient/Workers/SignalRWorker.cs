@@ -22,6 +22,7 @@ namespace BenchmarksClient.Workers
         private ClientJob _job;
         private HttpClientHandler _httpClientHandler;
         private List<HubConnection> _connections;
+        private List<IDisposable> _recvCallbacks;
         private Timer _timer;
         private int req;
 
@@ -96,8 +97,13 @@ namespace BenchmarksClient.Workers
                 _job.RequestsPerSecond = (float)req / _job.Duration;
                 Startup.Log(_job.RequestsPerSecond.ToString());
 
+                foreach (var callback in _recvCallbacks)
+                {
+                    callback.Dispose();
+                }
+
                 await _connections[0].SendAsync("Stop");
-                await Task.Delay(1000);
+                await Task.Delay(500);
 
                 // stop connections
                 var tasks = new List<Task>(_connections.Count);
@@ -110,6 +116,8 @@ namespace BenchmarksClient.Workers
 
                 _timer?.Dispose();
                 _timer = null;
+
+                await Task.Delay(1000);
 
                 Startup.Log("Stopped worker");
             }
@@ -161,18 +169,19 @@ namespace BenchmarksClient.Workers
                 hubConnectionBuilder.WithHeader(header.Key, header.Value);
             }
 
+            _recvCallbacks = new List<IDisposable>(_job.Connections);
             for (var i = 0; i < _job.Connections; i++)
             {
                 var connection = hubConnectionBuilder.Build();
                 _connections.Add(connection);
 
                 // setup event handlers
-                connection.On<DateTime>("echo", utcNow =>
+                _recvCallbacks.Add(connection.On<DateTime>("echo", utcNow =>
                 {
                     // TODO: Collect all the things
                     Interlocked.Increment(ref req);
                     // DateTime.UtcNow - utcNow for latency
-                });
+                }));
             }
         }
     }
