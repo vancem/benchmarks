@@ -23,7 +23,7 @@ namespace Benchmarks.Middleware
 
     public class EchoHub : Hub
     {
-        static bool Running;
+        //static bool Running;
 
         public override Task OnConnectedAsync()
         {
@@ -37,7 +37,7 @@ namespace Benchmarks.Middleware
 
         public async Task Echo(int duration)
         {
-            Running = true;
+            //Running = true;
             int i = 0;
             var t = new CancellationTokenSource();
             t.CancelAfter(TimeSpan.FromSeconds(duration));
@@ -55,7 +55,7 @@ namespace Benchmarks.Middleware
 
         public Task Stop()
         {
-            Running = false;
+            //Running = false;
             Console.WriteLine("Stop called");
             return Task.CompletedTask;
         }
