@@ -74,7 +74,7 @@ namespace BenchmarksClient.Workers
             _job.State = ClientState.Running;
 
             // SendAsync will return as soon as the request has been sent (non-blocking)
-            _echoTask =  _connections[0].InvokeAsync("Echo", _job.Duration + 1);
+            _echoTask = _connections[0].InvokeAsync<int>("Echo", _job.Duration + 1);
             _timer = new Timer(tt, null, TimeSpan.FromSeconds(_job.Duration), Timeout.InfiniteTimeSpan);
         }
 

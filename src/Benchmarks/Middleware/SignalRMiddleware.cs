@@ -35,7 +35,7 @@ namespace Benchmarks.Middleware
             return Task.CompletedTask;
         }
 
-        public async Task Echo(int duration)
+        public async Task<int> Echo(int duration)
         {
             //Running = true;
             int i = 0;
@@ -51,6 +51,7 @@ namespace Benchmarks.Middleware
                 }
             }
             Console.WriteLine("Echo exited");
+            return 0;
         }
 
         public Task Stop()
