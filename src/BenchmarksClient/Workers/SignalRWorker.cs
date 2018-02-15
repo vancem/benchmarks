@@ -25,6 +25,7 @@ namespace BenchmarksClient.Workers
         private List<IDisposable> _recvCallbacks;
         private Timer _timer;
         private int req;
+        private Task _echoTask;
 
         public SignalRWorker(ClientJob job)
         {
@@ -73,7 +74,7 @@ namespace BenchmarksClient.Workers
             _job.State = ClientState.Running;
 
             // SendAsync will return as soon as the request has been sent (non-blocking)
-            await _connections[0].SendAsync("Echo", 0);
+            _echoTask =  _connections[0].InvokeAsync("Echo", _job.Duration + 1);
             _timer = new Timer(tt, null, TimeSpan.FromSeconds(_job.Duration), Timeout.InfiniteTimeSpan);
         }
 
@@ -102,7 +103,8 @@ namespace BenchmarksClient.Workers
                     callback.Dispose();
                 }
 
-                await _connections[0].InvokeAsync("Stop");
+                //await _connections[0].InvokeAsync("Stop");
+                await _echoTask;
 
                 // stop connections
                 var tasks = new List<Task>(_connections.Count);

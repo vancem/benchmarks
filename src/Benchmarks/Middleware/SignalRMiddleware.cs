@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Benchmarks.Configuration;
 using Microsoft.AspNetCore.Builder;
@@ -34,11 +35,13 @@ namespace Benchmarks.Middleware
             return Task.CompletedTask;
         }
 
-        public async Task Echo(long timestamp)
+        public async Task Echo(int duration)
         {
             Running = true;
             int i = 0;
-            while (Running)
+            var t = new CancellationTokenSource();
+            t.CancelAfter(TimeSpan.FromSeconds(duration));
+            while (!t.IsCancellationRequested)
             {
                 await Clients.All.SendAsync("echo", DateTime.UtcNow);
                 i++;
