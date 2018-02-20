@@ -157,7 +157,8 @@ namespace Benchmarks
 
             if (Scenarios.Any("SignalR"))
             {
-                services.AddSignalR();
+                services.AddSignalR()
+                    .AddMessagePackProtocol();
             }
         }
 
