@@ -36,7 +36,7 @@ namespace BenchmarkServer
 
         public static void InitSubModules(string path)
         {
-            RunGitCommand(path, $"git submodule update --init", SubModuleTimeout, retries: 5);
+            RunGitCommand(path, $"submodule update --init", SubModuleTimeout, retries: 5);
         }
 
         private static ProcessResult RunGitCommand(string path, string command, TimeSpan? timeout, bool throwOnError = true, int retries = 0)
