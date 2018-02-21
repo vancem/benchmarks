@@ -38,17 +38,11 @@ namespace Benchmarks.Middleware
         public async Task<int> Echo(int duration)
         {
             //Running = true;
-            int i = 0;
             var t = new CancellationTokenSource();
             t.CancelAfter(TimeSpan.FromSeconds(duration));
             while (!t.IsCancellationRequested)
             {
                 await Clients.All.SendAsync("echo", DateTime.UtcNow);
-                i++;
-                if (i % 100000 == 0)
-                {
-                    await Task.Delay(1);
-                }
             }
             Console.WriteLine("Echo exited");
             return 0;

@@ -5,7 +5,7 @@
     <InternalAspNetCoreSdkVersion>2.1.1-*</InternalAspNetCoreSdkVersion>
     <JsonNetVersion>10.0.1</JsonNetVersion>
     <JilVersion>2.15.4</JilVersion>
-	<SignalRVersion>1.0.0-*</SignalRVersion>
+    <SignalRVersion>1.0.0-*</SignalRVersion>
     <NETStandardImplicitPackageVersion>2.0.0</NETStandardImplicitPackageVersion>
     <NETCoreAppImplicitPackageVersion>2.0.0</NETCoreAppImplicitPackageVersion>
     <MicrosoftNETCoreApp20PackageVersion>2.0.0</MicrosoftNETCoreApp20PackageVersion>
