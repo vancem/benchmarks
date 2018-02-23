@@ -132,7 +132,7 @@ namespace BenchmarkServer.Controllers
             }
         }
 
-        [HttpPut("{id}/resetstats")]
+        [HttpPost("{id}/resetstats")]
         public IActionResult ResetStats(int id)
         {
             lock (_jobs)
