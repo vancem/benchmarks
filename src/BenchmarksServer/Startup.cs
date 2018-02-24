@@ -839,7 +839,7 @@ namespace BenchmarkServer
                 if (!_installedRuntimes.Contains(runtimeFrameworkVersion))
                 {
                     // Install runtime required for this scenario
-                    ProcessUtil.Run("powershell", $"-NoProfile -ExecutionPolicy unrestricted .\\dotnet-install.ps1 -Version {runtimeFrameworkVersion} -SharedRuntime",
+                    ProcessUtil.Run("powershell", $"-NoProfile -ExecutionPolicy unrestricted .\\dotnet-install.ps1 -Version {runtimeFrameworkVersion} -Runtime dotnet -NoPath",
                     workingDirectory: buildToolsPath,
                     environmentVariables: env);
 
@@ -869,7 +869,7 @@ namespace BenchmarkServer
                 if (!_installedRuntimes.Contains(runtimeFrameworkVersion))
                 {
                     // Install runtime required by coherence universe
-                    ProcessUtil.Run("/usr/bin/env", $"bash dotnet-install.sh --version {runtimeFrameworkVersion} --shared-runtime",
+                    ProcessUtil.Run("/usr/bin/env", $"bash dotnet-install.sh --version {runtimeFrameworkVersion} --runtime dotnet --no-path",
                     workingDirectory: buildToolsPath,
                     environmentVariables: env);
 
