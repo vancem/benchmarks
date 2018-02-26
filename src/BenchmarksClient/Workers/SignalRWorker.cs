@@ -183,6 +183,11 @@ namespace BenchmarksClient.Workers
                     // TODO: Collect all the things
                     Interlocked.Increment(ref req);
                     // DateTime.UtcNow - utcNow for latency
+                    var latency = DateTime.UtcNow - utcNow;
+                    if (latency.Milliseconds > 500)
+                    {
+                        Startup.Log($"Latency was {latency.Milliseconds}");
+                    }
                 }));
             }
         }
