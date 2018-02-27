@@ -28,7 +28,10 @@ namespace BenchmarksClient.Workers
         private List<HubConnection> _connections;
         private List<IDisposable> _recvCallbacks;
         private Timer _timer;
-        private int req;
+        private List<int> _requestsPerConnection;
+        private List<List<double>> _latencyPerConnection;
+        private Stopwatch _workTimer = new Stopwatch();
+        private bool _stopped;
 
         public SignalRWorker(ClientJob job)
         {
@@ -78,6 +81,7 @@ namespace BenchmarksClient.Workers
 
             // SendAsync will return as soon as the request has been sent (non-blocking)
             await _connections[0].SendAsync("Echo", _job.Duration + 1);
+            _workTimer.Start();
             _timer = new Timer(tt, null, TimeSpan.FromSeconds(_job.Duration), Timeout.InfiniteTimeSpan);
         }
 
@@ -98,9 +102,6 @@ namespace BenchmarksClient.Workers
         {
             if (_timer != null)
             {
-                _job.RequestsPerSecond = (float)req / _job.Duration;
-                Startup.Log($"RPS: {_job.RequestsPerSecond.ToString()}");
-
                 _timer?.Dispose();
                 _timer = null;
 
@@ -108,6 +109,19 @@ namespace BenchmarksClient.Workers
                 {
                     callback.Dispose();
                 }
+
+                _workTimer.Stop();
+
+                var totalRequests = 0;
+                for (var i = 0; i < _requestsPerConnection.Count; i++)
+                {
+                    totalRequests += _requestsPerConnection[i];
+                }
+
+                var rps = (double)totalRequests / _workTimer.ElapsedMilliseconds * 1000;
+                Startup.Log($"Total RPS: {rps}");
+                _job.RequestsPerSecond = rps;
+                _stopped = true;
 
                 // stop connections
                 Startup.Log("Stopping connections");
@@ -141,6 +155,8 @@ namespace BenchmarksClient.Workers
         private void CreateConnections(TransportType transportType = TransportType.WebSockets)
         {
             _connections = new List<HubConnection>(_job.Connections);
+            _requestsPerConnection = new List<int>(_job.Connections);
+            _latencyPerConnection = new List<List<double>>(_job.Connections);
 
             var hubConnectionBuilder = new HubConnectionBuilder()
                 .WithUrl(_job.ServerBenchmarkUri)
@@ -174,21 +190,31 @@ namespace BenchmarksClient.Workers
             _recvCallbacks = new List<IDisposable>(_job.Connections);
             for (var i = 0; i < _job.Connections; i++)
             {
+                _requestsPerConnection.Add(0);
+                _latencyPerConnection.Add(new List<double>());
                 var connection = hubConnectionBuilder.Build();
                 _connections.Add(connection);
 
+                var id = i;
                 // setup event handlers
                 _recvCallbacks.Add(connection.On<DateTime>("echo", utcNow =>
                 {
                     // TODO: Collect all the things
-                    Interlocked.Increment(ref req);
-                    // DateTime.UtcNow - utcNow for latency
+
                     var latency = DateTime.UtcNow - utcNow;
-                    if (latency.Milliseconds > 500)
+                    if (latency.TotalMilliseconds > 500)
                     {
-                        Startup.Log($"Latency was {latency.Milliseconds}");
+                        Startup.Log($"Latency was {latency.TotalMilliseconds}");
                     }
                 }));
+
+                connection.Closed += e =>
+                {
+                    if (!_stopped)
+                    {
+                        Startup.Log("Connection closed early");
+                    }
+                };
             }
         }
     }
