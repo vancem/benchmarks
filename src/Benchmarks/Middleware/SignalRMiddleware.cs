@@ -23,8 +23,6 @@ namespace Benchmarks.Middleware
 
     public class EchoHub : Hub
     {
-        //static bool Running;
-
         public override Task OnConnectedAsync()
         {
             return Task.CompletedTask;
@@ -35,24 +33,23 @@ namespace Benchmarks.Middleware
             return Task.CompletedTask;
         }
 
-        public async Task<int> Echo(int duration)
+        public async Task Echo(int duration)
         {
-            //Running = true;
-            var t = new CancellationTokenSource();
-            t.CancelAfter(TimeSpan.FromSeconds(duration));
-            while (!t.IsCancellationRequested)
+            try
             {
-                await Clients.All.SendAsync("echo", DateTime.UtcNow);
+                var t = new CancellationTokenSource();
+                t.CancelAfter(TimeSpan.FromSeconds(duration));
+                while (!t.IsCancellationRequested)
+                {
+                    await Clients.All.SendAsync("echo", DateTime.UtcNow);
+                }
             }
-            Console.WriteLine("Echo exited");
-            return 0;
-        }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
 
-        public Task Stop()
-        {
-            //Running = false;
-            Console.WriteLine("Stop called");
-            return Task.CompletedTask;
+            Console.WriteLine("Echo exited");
         }
     }
 }
