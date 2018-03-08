@@ -36,6 +36,8 @@ namespace BenchmarkServer
         private static readonly HttpClientHandler _httpClientHandler;
         private static readonly string _dotnetInstallRepoUrl = "https://raw.githubusercontent.com/dotnet/cli/master/scripts/obtain/";
         private static readonly string _latestAspnetCoreRuntimeUrl = "https://dotnet.myget.org/F/aspnetcore-dev/api/v3/registration1/aspnetcoreruntime/index.json";
+        private static readonly string _currentDotnetRuntimeUrl = "https://dotnetcli.blob.core.windows.net/dotnet/Runtime/master/latest.version";
+        private static readonly string _edgeDotnetRuntimeUrl = "https://dotnetcli.blob.core.windows.net/dotnet/Runtime/master/latest.version";
         private static readonly string[] _dotnetInstallPaths = new string[] { "dotnet-install.sh", "dotnet-install.ps1" };
         private static readonly string _sdkVersionUrl = "https://raw.githubusercontent.com/aspnet/BuildTools/dev/files/KoreBuild/config/sdk.version";
         private static readonly string _universeDependenciesUrl = "https://raw.githubusercontent.com/aspnet/Universe/dev/build/dependencies.props";
@@ -774,6 +776,7 @@ namespace BenchmarkServer
             string targetFramework;
             string runtimeFrameworkVersion;
             string aspNetCoreVersion;
+            string actualAspNetCoreVersion;
 
             if (!String.Equals(job.RuntimeVersion, "Current", StringComparison.OrdinalIgnoreCase))
             {
@@ -783,6 +786,10 @@ namespace BenchmarkServer
                 if (String.Equals(job.RuntimeVersion, "Latest", StringComparison.OrdinalIgnoreCase))
                 {
                     runtimeFrameworkVersion = await GetLatestRuntimeVersion(buildToolsPath);
+                }
+                else if (String.Equals(job.RuntimeVersion, "Edge", StringComparison.OrdinalIgnoreCase))
+                {
+                    runtimeFrameworkVersion = await GetEdgeRuntimeVersion(buildToolsPath);
                 }
                 else
                 {
@@ -794,7 +801,7 @@ namespace BenchmarkServer
             {
                 // Latest public version
                 File.WriteAllText(Path.Combine(benchmarkedApp, "global.json"), "{  \"sdk\": { \"version\": \"" + sdkVersion + "\" } }");
-                runtimeFrameworkVersion = "2.0.3";
+                runtimeFrameworkVersion = await GetCurrentRuntimeVersion(buildToolsPath);
                 targetFramework = "netcoreapp2.0";
             }
 
@@ -803,17 +810,17 @@ namespace BenchmarkServer
             {
                 case "current":
                     aspNetCoreVersion = "2.0.*";
+                    actualAspNetCoreVersion = aspNetCoreVersion;
                     break;
                 case "latest":
-                    // Temporary value to prevent feature branches from being used
-                    // aspNetCoreVersion = "2.1-*";
-                    aspNetCoreVersion = "2.1.0-preview2-3*";
+                    aspNetCoreVersion = "2.1-*";
+                    actualAspNetCoreVersion = await GetLatestAspNetCoreRuntimeVersion(buildToolsPath);
                     break;
                 default:
                     aspNetCoreVersion = job.AspNetCoreVersion;
+                    actualAspNetCoreVersion = aspNetCoreVersion;
                     break;
             }
-
 
             if (OperatingSystem == OperatingSystem.Windows)
             {
@@ -890,7 +897,7 @@ namespace BenchmarkServer
             }
 
             // Updating ServerJob to reflect actual versions used
-            job.AspNetCoreVersion = await GetLatestAspNetCoreRuntimeVersion(buildToolsPath);
+            job.AspNetCoreVersion = actualAspNetCoreVersion;
             job.RuntimeVersion = runtimeFrameworkVersion;
             job.SdkVersion = sdkVersion;
 
@@ -969,6 +976,9 @@ namespace BenchmarkServer
             return (benchmarkedDir, dotnetDir);
         }
 
+        /// <summary>
+        /// Retrieves the runtime version used on ASP.NET Coherence builds
+        /// </summary>
         private static async Task<string> GetLatestRuntimeVersion(string buildToolsPath)
         {
             var universeDependenciesPath = Path.Combine(buildToolsPath, Path.GetFileName(_universeDependenciesUrl));
@@ -982,6 +992,9 @@ namespace BenchmarkServer
             return latestRuntimeVersion;
         }
 
+        /// <summary>
+        /// Retrieves the latest coherent ASP.NET version
+        /// </summary>
         private static async Task<string> GetLatestAspNetCoreRuntimeVersion(string buildToolsPath)
         {
             var aspnetCoreRuntimePath = Path.Combine(buildToolsPath, "aspnetCoreRuntimePath.json");
@@ -993,6 +1006,40 @@ namespace BenchmarkServer
 
             Log.WriteLine($"Detecting AspNet Core runtime version: {latestAspNetCoreRuntime}");
             return latestAspNetCoreRuntime;
+        }
+
+        /// <summary>
+        /// Retrieves the latest runtime version
+        /// </summary>
+        /// <param name="buildToolsPath"></param>
+        /// <returns></returns>
+        private static async Task<string> GetEdgeRuntimeVersion(string buildToolsPath)
+        {
+            var edgeRuntimePath = Path.Combine(buildToolsPath, "edgeDotnetRuntimeVersion.txt");
+            await DownloadFileAsync(_edgeDotnetRuntimeUrl, edgeRuntimePath, maxRetries: 5);
+            var content = await File.ReadAllLinesAsync(edgeRuntimePath);
+
+            // Read the last line that contains the version
+            var edgeDotnetRuntime = content.Last();
+
+            Log.WriteLine($"Detecting latest runtime version: {edgeDotnetRuntime}");
+            return edgeDotnetRuntime;
+        }
+
+        /// <summary>
+        /// Retrieves the Current runtime version
+        /// </summary>
+        private static async Task<string> GetCurrentRuntimeVersion(string buildToolsPath)
+        {
+            var currentRuntimePath = Path.Combine(buildToolsPath, "currentDotnetRuntimeVersion.txt");
+            await DownloadFileAsync(_currentDotnetRuntimeUrl, currentRuntimePath, maxRetries: 5);
+            var content = await File.ReadAllLinesAsync(currentRuntimePath);
+
+            // Read the last line that contains the version
+            var currentDotnetRuntime = content.Last();
+
+            Log.WriteLine($"Detecting current runtime version: {currentDotnetRuntime}");
+            return currentDotnetRuntime;
         }
 
         private static async Task DownloadBuildTools(string buildToolsPath)
