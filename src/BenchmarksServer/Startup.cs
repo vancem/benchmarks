@@ -19,14 +19,12 @@ using Benchmarks.ServerJob;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
-using Repository;
-
-using OperatingSystem = Benchmarks.ServerJob.OperatingSystem;
-using Newtonsoft.Json;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
+using Repository;
+using OperatingSystem = Benchmarks.ServerJob.OperatingSystem;
 
 namespace BenchmarkServer
 {
@@ -759,13 +757,13 @@ namespace BenchmarkServer
             var sdkVersionPath = Path.Combine(buildToolsPath, Path.GetFileName(_sdkVersionUrl));
             await DownloadFileAsync(_sdkVersionUrl, sdkVersionPath, maxRetries: 5);
 
-            // var sdkVersion = File.ReadAllText(sdkVersionPath);
-            // Log.WriteLine($"Detecting latest SDK version: {sdkVersion}");
+            var sdkVersion = File.ReadAllText(sdkVersionPath);
+            Log.WriteLine($"Detecting latest SDK version: {sdkVersion}");
 
             // This is the last known working SDK with Benchmarks on Linux
-            var sdkVersion = "2.2.0-preview1-007522";
-            Log.WriteLine($"WARNING !!! CHANGE WHEN FIXED");
-            Log.WriteLine($"Using last known compatible SDK: {sdkVersion}");
+            //var sdkVersion = "2.2.0-preview1-007522";
+            //Log.WriteLine($"WARNING !!! CHANGE WHEN FIXED");
+            //Log.WriteLine($"Using last known compatible SDK: {sdkVersion}");
 
             // In theory the actual latest runtime version should be taken from the dependencies.pros file from 
             // https://dotnet.myget.org/feed/aspnetcore-dev/package/nuget/Internal.AspNetCore.Universe.Lineup
