@@ -795,6 +795,11 @@ namespace BenchmarkServer
                 {
                     // Custom version
                     runtimeFrameworkVersion = job.RuntimeVersion;
+
+                    if (runtimeFrameworkVersion.StartsWith("2.0"))
+                    {
+                        targetFramework = "netcoreapp2.1";
+                    }
                 }
             }
             else
