@@ -36,7 +36,7 @@ namespace BenchmarkServer
         private static readonly HttpClientHandler _httpClientHandler;
         private static readonly string _dotnetInstallRepoUrl = "https://raw.githubusercontent.com/dotnet/cli/master/scripts/obtain/";
         private static readonly string _latestAspnetCoreRuntimeUrl = "https://dotnet.myget.org/F/aspnetcore-dev/api/v3/registration1/aspnetcoreruntime/index.json";
-        private static readonly string _currentDotnetRuntimeUrl = "https://dotnetcli.blob.core.windows.net/dotnet/Runtime/master/latest.version";
+        private static readonly string _currentDotnetRuntimeUrl = "https://dotnetcli.blob.core.windows.net/dotnet/Runtime/Current/latest.version";
         private static readonly string _edgeDotnetRuntimeUrl = "https://dotnetcli.blob.core.windows.net/dotnet/Runtime/master/latest.version";
         private static readonly string[] _dotnetInstallPaths = new string[] { "dotnet-install.sh", "dotnet-install.ps1" };
         private static readonly string _sdkVersionUrl = "https://raw.githubusercontent.com/aspnet/BuildTools/dev/files/KoreBuild/config/sdk.version";
@@ -1009,7 +1009,7 @@ namespace BenchmarkServer
             var latestAspNetCoreRuntime = (string)aspnetCoreRuntime["items"].Last()["upper"];
 
 
-            Log.WriteLine($"Detecting AspNet Core runtime version: {latestAspNetCoreRuntime}");
+            Log.WriteLine($"Detecting latest runtime version: {latestAspNetCoreRuntime}");
             return latestAspNetCoreRuntime;
         }
 
@@ -1027,7 +1027,7 @@ namespace BenchmarkServer
             // Read the last line that contains the version
             var edgeDotnetRuntime = content.Last();
 
-            Log.WriteLine($"Detecting latest runtime version: {edgeDotnetRuntime}");
+            Log.WriteLine($"Detecting edge runtime version: {edgeDotnetRuntime}");
             return edgeDotnetRuntime;
         }
 
