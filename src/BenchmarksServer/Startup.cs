@@ -813,9 +813,7 @@ namespace BenchmarkServer
                     actualAspNetCoreVersion = aspNetCoreVersion;
                     break;
                 case "latest":
-                    // Temporary value to prevent feature branches from being used
-                    // aspNetCoreVersion = "2.1-*";
-                    aspNetCoreVersion = "2.1.0-preview2-3*";
+                    aspNetCoreVersion = "2.1-*";
                     actualAspNetCoreVersion = await GetLatestAspNetCoreRuntimeVersion(buildToolsPath);
                     break;
                 default:
