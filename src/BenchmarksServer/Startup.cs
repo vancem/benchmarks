@@ -757,7 +757,7 @@ namespace BenchmarkServer
             var sdkVersionPath = Path.Combine(buildToolsPath, Path.GetFileName(_sdkVersionUrl));
             await DownloadFileAsync(_sdkVersionUrl, sdkVersionPath, maxRetries: 5);
 
-            var sdkVersion = File.ReadAllText(sdkVersionPath);
+            var sdkVersion = File.ReadAllText(sdkVersionPath).Trim();
             Log.WriteLine($"Detecting latest SDK version: {sdkVersion}");
 
             // This is the last known working SDK with Benchmarks on Linux
