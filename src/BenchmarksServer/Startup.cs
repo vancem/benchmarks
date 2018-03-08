@@ -778,7 +778,6 @@ namespace BenchmarkServer
 
             if (!String.Equals(job.RuntimeVersion, "Current", StringComparison.OrdinalIgnoreCase))
             {
-                File.WriteAllText(Path.Combine(benchmarkedApp, "global.json"), "{  \"sdk\": { \"version\": \"" + sdkVersion + "\" } }");
                 targetFramework = "netcoreapp2.1";
 
                 if (String.Equals(job.RuntimeVersion, "Latest", StringComparison.OrdinalIgnoreCase))
@@ -802,14 +801,16 @@ namespace BenchmarkServer
             }
             else
             {
-                // Latest public version
-                File.WriteAllText(Path.Combine(benchmarkedApp, "global.json"), "{  \"sdk\": { \"version\": \"" + sdkVersion + "\" } }");
                 runtimeFrameworkVersion = await GetCurrentRuntimeVersion(buildToolsPath);
                 targetFramework = "netcoreapp2.0";
             }
 
+            var globalJson = "{ \"sdk\": { \"version\": \"" + sdkVersion + "\" } }";
+            Log.WriteLine($"Writing global.json with content: {globalJson}");
+            File.WriteAllText(Path.Combine(benchmarkedApp, "global.json"), globalJson);
+
             // Define which ASP.NET Core packages version to use
-            switch(job.AspNetCoreVersion.ToLowerInvariant())
+            switch (job.AspNetCoreVersion.ToLowerInvariant())
             {
                 case "current":
                     aspNetCoreVersion = "2.0.*";
