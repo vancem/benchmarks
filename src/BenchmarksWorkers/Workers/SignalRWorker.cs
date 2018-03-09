@@ -6,10 +6,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Net.WebSockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Benchmarks.ClientJob;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.AspNetCore.SignalR.Internal;
+using Microsoft.AspNetCore.SignalR.Internal.Encoders;
+using Microsoft.AspNetCore.SignalR.Internal.Protocol;
 using Microsoft.AspNetCore.Sockets;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -22,7 +26,7 @@ namespace BenchmarksWorkers.Workers
 
         private ClientJob _job;
         private HttpClientHandler _httpClientHandler;
-        private List<HubConnection> _connections;
+        private List<ConnectionWrapper> _connections;
         private List<IDisposable> _recvCallbacks;
         private Timer _timer;
         private List<int> _requestsPerConnection;
@@ -51,37 +55,25 @@ namespace BenchmarksWorkers.Workers
                 jobLogText += $" Headers:{JsonConvert.SerializeObject(_job.Headers)}";
             }
 
-            TransportType transportType = default;
             if (_job.ClientProperties.TryGetValue("TransportType", out var transport))
             {
-                transportType = Enum.Parse<TransportType>(transport);
-                jobLogText += $" TransportType:{transportType}";
+                jobLogText += $" TransportType:{transport}";
             }
 
             jobLogText += "]";
             JobLogText = jobLogText;
 
-            CreateConnections(transportType);
+            CreateConnections(transport);
         }
 
         public async Task StartAsync()
         {
-            // start connections
-            var tasks = new List<Task>(_connections.Count);
-            foreach (var connection in _connections)
-            {
-                tasks.Add(connection.StartAsync());
-            }
-
-            await Task.WhenAll(tasks);
+            await StartConnections();
+            _workTimer.Start();
+            _timer = new Timer(StopClients, null, TimeSpan.FromSeconds(_job.Duration), Timeout.InfiniteTimeSpan);
 
             _job.State = ClientState.Running;
             _job.LastDriverCommunicationUtc = DateTime.UtcNow;
-
-            // SendAsync will return as soon as the request has been sent (non-blocking)
-            await _connections[0].SendAsync("Echo", _job.Duration + 1);
-            _workTimer.Start();
-            _timer = new Timer(StopClients, null, TimeSpan.FromSeconds(_job.Duration), Timeout.InfiniteTimeSpan);
         }
 
         private async void StopClients(object t)
@@ -159,79 +151,19 @@ namespace BenchmarksWorkers.Workers
             _httpClientHandler.Dispose();
         }
 
-        private void CreateConnections(TransportType transportType = TransportType.WebSockets)
+        private void CreateConnections(string transport)
         {
-            _connections = new List<HubConnection>(_job.Connections);
+            _connections = new List<ConnectionWrapper>(_job.Connections);
             _requestsPerConnection = new List<int>(_job.Connections);
             _latencyPerConnection = new List<List<double>>(_job.Connections);
 
-            var hubConnectionBuilder = new HubConnectionBuilder()
-                .WithUrl(_job.ServerBenchmarkUri)
-                .WithMessageHandler(_httpClientHandler)
-                .WithTransport(transportType);
-
-            if (_job.ClientProperties.TryGetValue("LogLevel", out var logLevel))
+            if (string.Equals(transport, "sockets"))
             {
-                if (Enum.TryParse<LogLevel>(logLevel, ignoreCase: true, result: out var level))
-                {
-                    hubConnectionBuilder.WithConsoleLogger(level);
-                }
-            }
-
-            if (_job.ClientProperties.TryGetValue("HubProtocol", out var protocolName))
-            {
-                switch (protocolName)
-                {
-                    case "messagepack":
-                        hubConnectionBuilder.WithMessagePackProtocol();
-                        break;
-                    case "json":
-                        hubConnectionBuilder.WithJsonProtocol();
-                        break;
-                    default:
-                        throw new Exception($"{protocolName} is an invalid hub protocol name.");
-                }
+                CreateSockets();
             }
             else
             {
-                hubConnectionBuilder.WithJsonProtocol();
-            }
-
-            foreach (var header in _job.Headers)
-            {
-                hubConnectionBuilder.WithHeader(header.Key, header.Value);
-            }
-
-            _recvCallbacks = new List<IDisposable>(_job.Connections);
-            for (var i = 0; i < _job.Connections; i++)
-            {
-                _requestsPerConnection.Add(0);
-                _latencyPerConnection.Add(new List<double>());
-
-                var connection = hubConnectionBuilder.Build();
-                _connections.Add(connection);
-
-                // Capture the connection ID
-                var id = i;
-                // setup event handlers
-                _recvCallbacks.Add(connection.On<DateTime>("echo", utcNow =>
-                {
-                    // TODO: Collect all the things
-                    _requestsPerConnection[id] += 1;
-
-                    var latency = DateTime.UtcNow - utcNow;
-                    _latencyPerConnection[id].Add(latency.TotalMilliseconds);
-                }));
-
-                connection.Closed += e =>
-                {
-                    if (!_stopped)
-                    {
-                        var error = $"Connection closed early: {e}";
-                        _job.Error += error;
-                        Log(error);
-                    }
-                };
+                CreateHubConnections(transport);
             }
         }
 
@@ -316,6 +248,200 @@ namespace BenchmarksWorkers.Workers
         {
             var time = DateTime.Now.ToString("hh:mm:ss.fff");
             Console.WriteLine($"[{time}] {message}");
+        }
+
+        private void CreateSockets()
+        {
+            for (var i = 0; i < _job.Connections; i++)
+            {
+                _connections.Add(new ConnectionWrapper(new ClientWebSocket(), _job));
+            }
+        }
+
+        private void CreateHubConnections(string transport)
+        {
+            var hubConnectionBuilder = new HubConnectionBuilder()
+                .WithUrl(_job.ServerBenchmarkUri)
+                .WithMessageHandler(_httpClientHandler)
+                .WithTransport(Enum.Parse<TransportType>(transport));
+
+            if (_job.ClientProperties.TryGetValue("LogLevel", out var logLevel))
+            {
+                if (Enum.TryParse<LogLevel>(logLevel, ignoreCase: true, result: out var level))
+                {
+                    hubConnectionBuilder.WithConsoleLogger(level);
+                }
+            }
+
+            if (_job.ClientProperties.TryGetValue("HubProtocol", out var protocolName))
+            {
+                switch (protocolName)
+                {
+                    case "messagepack":
+                        hubConnectionBuilder.WithMessagePackProtocol();
+                        break;
+                    case "json":
+                        hubConnectionBuilder.WithJsonProtocol();
+                        break;
+                    default:
+                        throw new Exception($"{protocolName} is an invalid hub protocol name.");
+                }
+            }
+            else
+            {
+                hubConnectionBuilder.WithJsonProtocol();
+            }
+
+            foreach (var header in _job.Headers)
+            {
+                hubConnectionBuilder.WithHeader(header.Key, header.Value);
+            }
+
+            _recvCallbacks = new List<IDisposable>(_job.Connections);
+            for (var i = 0; i < _job.Connections; i++)
+            {
+                _requestsPerConnection.Add(0);
+                _latencyPerConnection.Add(new List<double>());
+
+                var connection = hubConnectionBuilder.Build();
+                _connections.Add(new ConnectionWrapper(connection));
+
+                // Capture the connection ID
+                var id = i;
+                // setup event handlers
+                _recvCallbacks.Add(connection.On<DateTime>("echo", utcNow =>
+                {
+                    // TODO: Collect all the things
+                    _requestsPerConnection[id] += 1;
+
+                    var latency = DateTime.UtcNow - utcNow;
+                    _latencyPerConnection[id].Add(latency.TotalMilliseconds);
+                }));
+
+                connection.Closed += e =>
+                {
+                    if (!_stopped)
+                    {
+                        var error = $"Connection closed early: {e}";
+                        _job.Error += error;
+                        Log(error);
+                    }
+                };
+            }
+        }
+
+        private async Task StartConnections()
+        {
+            // start connections
+            var tasks = new List<Task>(_connections.Count);
+            foreach (var connection in _connections)
+            {
+                tasks.Add(connection.StartAsync());
+            }
+
+            await Task.WhenAll(tasks);
+
+            // SendAsync will return as soon as the request has been sent (non-blocking)
+            await _connections[0].SendAsync("Echo", _job.Duration + 1);
+        }
+
+        private class ConnectionWrapper
+        {
+            private readonly HubConnection _hubConnection;
+            private readonly ClientWebSocket _socketConnection;
+            private readonly ClientJob _job;
+            private long _count;
+
+            private HubProtocolReaderWriter _hubProtocolReaderWriter;
+
+            public ConnectionWrapper(HubConnection connection)
+            {
+                _hubConnection = connection;
+            }
+
+            public ConnectionWrapper(ClientWebSocket connection, ClientJob job)
+            {
+                _socketConnection = connection;
+                _job = job;
+            }
+
+            public async Task StartAsync()
+            {
+                if (_hubConnection != null)
+                {
+                    await _hubConnection.StartAsync();
+                }
+                else
+                {
+                    _hubProtocolReaderWriter = new HubProtocolReaderWriter(new MessagePackHubProtocol(), new PassThroughEncoder());
+                    await _socketConnection.ConnectAsync(new Uri(_job.ServerBenchmarkUri), default);
+                    var protocol = "json";
+                    _job.ClientProperties.TryGetValue("HubProtocol", out protocol);
+                    var neg = $"{{\"protocol\": \"{protocol}\"}}";
+                    await _socketConnection.SendAsync(Encoding.UTF8.GetBytes(neg), WebSocketMessageType.Binary, true, default);
+
+                    // setup receive
+                    _ = Task.Run(async () =>
+                    {
+
+                        while (_socketConnection.State != WebSocketState.Aborted &&
+                            _socketConnection.State != WebSocketState.Closed &&
+                            _socketConnection.State != WebSocketState.CloseReceived &&
+                            _socketConnection.State != WebSocketState.CloseSent)
+                        {
+                            var buffer = new byte[4096];
+                            var result = await _socketConnection.ReceiveAsync(buffer, default);
+
+                            if (result.CloseStatus != null)
+                            {
+                                Log($"Connection closed early: {result.CloseStatus}");
+                                return;
+                            }
+
+                            _count += result.Count;
+                            //_hubProtocolReaderWriter.ReadMessages(buffer, )
+                        }
+                    });
+                }
+            }
+
+            public Task SendAsync(string target, params object[] args)
+            {
+                if (_hubConnection != null)
+                {
+                    return _hubConnection.SendAsync(target, args);
+                }
+                else
+                {
+                    var bytes = _hubProtocolReaderWriter.WriteMessage(new InvocationMessage(target, null, args));
+                    return _socketConnection.SendAsync(bytes, WebSocketMessageType.Binary, true, default);
+                }
+            }
+
+            public Task StopAsync()
+            {
+                if (_hubConnection != null)
+                {
+                    return _hubConnection.StopAsync();
+                }
+                else
+                {
+                    Log($"Total bytes received: {_count}");
+                    return _socketConnection.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, string.Empty, default);
+                }
+            }
+
+            public async Task DisposeAsync()
+            {
+                if (_hubConnection != null)
+                {
+                    await _hubConnection.DisposeAsync();
+                }
+                else
+                {
+                    _socketConnection.Dispose();
+                }
+            }
         }
     }
 }
