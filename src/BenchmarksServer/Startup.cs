@@ -536,19 +536,18 @@ namespace BenchmarkServer
                         {
                             await StopJobAsync();
 
-                            if (_cleanup && tempDir != null)
+                            if (_cleanup && !job.NoClean && tempDir != null)
                             {
                                 DeleteDir(tempDir);
                             }
 
                             // If a custom dotnet directory was used, clean it
-                            if (_cleanup && dotnetDir != dotnetHome)
+                            if (_cleanup && !job.NoClean && dotnetDir != dotnetHome)
                             {
                                 DeleteDir(dotnetDir);
                             }
 
                             // Clean attachments
-
                             foreach (var attachment in job.Attachments)
                             {
                                 try
