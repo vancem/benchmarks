@@ -298,7 +298,18 @@ namespace BenchmarkServer
 
                         var perfviewEnabled = job.Collect && OperatingSystem == OperatingSystem.Windows;
 
-                        if (job.State == ServerState.Waiting)
+                        if (job.State == ServerState.Failed)
+                        {
+                            var now = DateTime.UtcNow;
+
+                            // Clean the job in case the driver is not running
+                            if (now - job.LastDriverCommunicationUtc > TimeSpan.FromSeconds(30))
+                            {
+                                Log.WriteLine($"Driver didn't communicate for {now - job.LastDriverCommunicationUtc}. Halting job.");
+                                job.State = ServerState.Deleting;
+                            }
+                        }
+                        else if (job.State == ServerState.Waiting)
                         {
                             // TODO: Race condition if DELETE is called during this code
                             try
@@ -326,10 +337,17 @@ namespace BenchmarkServer
                                     // returns the application directory and the dotnet directory to use
                                     (benchmarksDir, dotnetDir) = await CloneRestoreAndBuild(tempDir, job, dotnetDir);
 
-                                    Debug.Assert(process == null);
-                                    process = StartProcess(hostname, Path.Combine(tempDir, benchmarksDir), job, dotnetDir, perfviewEnabled);
+                                    if (benchmarksDir != null && dotnetDir != null)
+                                    {
+                                        Debug.Assert(process == null);
+                                        process = StartProcess(hostname, Path.Combine(tempDir, benchmarksDir), job, dotnetDir, perfviewEnabled);
 
-                                    job.ProcessId = process.Id;
+                                        job.ProcessId = process.Id;
+                                    }
+                                    else
+                                    {
+                                        job.State = ServerState.Failed;
+                                    }
                                 }
 
                                 var startMonitorTime = DateTime.UtcNow;
@@ -387,7 +405,7 @@ namespace BenchmarkServer
                                                 CpuPercentage = cpu
                                             });
                                         }
-                                        else
+                                        else if (!String.IsNullOrEmpty(dockerImage))
                                         {
                                             // Get docker stats
                                             var result = ProcessUtil.Run("docker", "container stats --no-stream --format \"{{.CPUPerc}}-{{.MemUsage}}\" " + dockerContainerId);
@@ -443,11 +461,7 @@ namespace BenchmarkServer
                             catch (Exception e)
                             {
                                 Log.WriteLine($"Error starting job '{job.Id}': {e}");
-
                                 job.State = ServerState.Failed;
-
-                                await DeleteJobAsync();
-
                                 continue;
                             }
                         }
@@ -926,9 +940,20 @@ namespace BenchmarkServer
             {
                 var outputFolder = Path.Combine(benchmarkedApp, "published");
 
-                ProcessUtil.Run(dotnetExecutable, $"publish -c Release -o {outputFolder} {buildParameters}",
+                var arguments = $"publish -c Release -o {outputFolder} {buildParameters}";
+                var buildResults = ProcessUtil.Run(dotnetExecutable, arguments,
                     workingDirectory: benchmarkedApp,
-                    environmentVariables: env);
+                    environmentVariables: env,
+                    throwOnError: false);
+
+                if (buildResults.ExitCode != 0)
+                {
+                    job.Error = $"Command dotnet {arguments} returned exit code {buildResults.ExitCode} \n" +
+                        buildResults.StandardOutput + "\n" +
+                        buildResults.StandardError;
+
+                    return (null, null);
+                }
 
                 // Copy all output attachments
                 foreach (var attachment in job.Attachments.Where(x => x.Location == AttachmentLocation.Output))
