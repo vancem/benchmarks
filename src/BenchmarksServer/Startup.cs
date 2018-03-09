@@ -295,6 +295,7 @@ namespace BenchmarkServer
                     {
                         string dotnetDir = dotnetHome;
                         string benchmarksDir = null;
+                        var output = new StringBuilder();
 
                         var perfviewEnabled = job.Collect && OperatingSystem == OperatingSystem.Windows;
 
@@ -340,7 +341,7 @@ namespace BenchmarkServer
                                     if (benchmarksDir != null && dotnetDir != null)
                                     {
                                         Debug.Assert(process == null);
-                                        process = StartProcess(hostname, Path.Combine(tempDir, benchmarksDir), job, dotnetDir, perfviewEnabled);
+                                        process = StartProcess(hostname, Path.Combine(tempDir, benchmarksDir), job, dotnetDir, perfviewEnabled, output);
 
                                         job.ProcessId = process.Id;
                                     }
@@ -388,22 +389,36 @@ namespace BenchmarkServer
 
                                         if (process != null)
                                         {
-                                            // TODO: Accessing the TotalProcessorTime on OSX throws so just leave it as 0 for now
-                                            // We need to dig into this
-                                            var newCPUTime = OperatingSystem == OperatingSystem.OSX ? TimeSpan.Zero : process.TotalProcessorTime;
-                                            var elapsed = now.Subtract(lastMonitorTime).TotalMilliseconds;
-                                            var cpu = Math.Round((newCPUTime - oldCPUTime).TotalMilliseconds / (Environment.ProcessorCount * elapsed) * 100);
-                                            lastMonitorTime = now;
-                                            oldCPUTime = newCPUTime;
-
-                                            process.Refresh();
-
-                                            job.AddServerCounter(new ServerCounter
+                                            if (process.HasExited)
                                             {
-                                                Elapsed = now - startMonitorTime,
-                                                WorkingSet = process.WorkingSet64,
-                                                CpuPercentage = cpu
-                                            });
+                                                if (process.ExitCode != 0)
+                                                {
+                                                    Log.WriteLine($"Job failed");
+
+                                                    job.Error = "Job failed at runtime\n" + output.ToString();
+                                                    job.State = ServerState.Failed;
+                                                }
+                                            }
+                                            else
+                                            {
+
+                                                // TODO: Accessing the TotalProcessorTime on OSX throws so just leave it as 0 for now
+                                                // We need to dig into this
+                                                var newCPUTime = OperatingSystem == OperatingSystem.OSX ? TimeSpan.Zero : process.TotalProcessorTime;
+                                                var elapsed = now.Subtract(lastMonitorTime).TotalMilliseconds;
+                                                var cpu = Math.Round((newCPUTime - oldCPUTime).TotalMilliseconds / (Environment.ProcessorCount * elapsed) * 100);
+                                                lastMonitorTime = now;
+                                                oldCPUTime = newCPUTime;
+
+                                                process.Refresh();
+
+                                                job.AddServerCounter(new ServerCounter
+                                                {
+                                                    Elapsed = now - startMonitorTime,
+                                                    WorkingSet = process.WorkingSet64,
+                                                    CpuPercentage = cpu
+                                                });
+                                            }
                                         }
                                         else if (!String.IsNullOrEmpty(dockerImage))
                                         {
@@ -1295,7 +1310,7 @@ namespace BenchmarkServer
                 : Path.Combine(dotnetHome, "dotnet");
         }
 
-        private static Process StartProcess(string hostname, string benchmarksRepo, ServerJob job, string dotnetHome, bool perfview)
+        private static Process StartProcess(string hostname, string benchmarksRepo, ServerJob job, string dotnetHome, bool perfview, StringBuilder output)
         {
             var serverUrl = $"{job.Scheme.ToString().ToLowerInvariant()}://{hostname}:{job.Port}";
             var dotnetFilename = GetDotNetExecutable(dotnetHome);
@@ -1377,6 +1392,7 @@ namespace BenchmarkServer
                 if (e != null && e.Data != null)
                 {
                     Log.WriteLine(e.Data);
+                    output.Append(e.Data);
 
                     if (job.State == ServerState.Starting && (e.Data.ToLowerInvariant().Contains("started") || e.Data.ToLowerInvariant().Contains("listening")))
                     {
