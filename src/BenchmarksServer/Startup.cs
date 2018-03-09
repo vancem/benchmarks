@@ -1392,7 +1392,7 @@ namespace BenchmarkServer
                 if (e != null && e.Data != null)
                 {
                     Log.WriteLine(e.Data);
-                    output.Append(e.Data);
+                    outputBuilder.AppendLine(e.Data);
 
                     if (job.State == ServerState.Starting && (e.Data.ToLowerInvariant().Contains("started") || e.Data.ToLowerInvariant().Contains("listening")))
                     {
