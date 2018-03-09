@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+﻿C// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -756,13 +756,13 @@ namespace BenchmarkServer
             var sdkVersionPath = Path.Combine(buildToolsPath, Path.GetFileName(_sdkVersionUrl));
             await DownloadFileAsync(_sdkVersionUrl, sdkVersionPath, maxRetries: 5);
 
-            var sdkVersion = File.ReadAllText(sdkVersionPath).Trim();
-            Log.WriteLine($"Detecting compatible SDK version: {sdkVersion}");
+            //var sdkVersion = File.ReadAllText(sdkVersionPath).Trim();
+            //Log.WriteLine($"Detecting compatible SDK version: {sdkVersion}");
 
             // This is the last known working SDK with Benchmarks on Linux
-            //var sdkVersion = "2.2.0-preview1-007522";
-            //Log.WriteLine($"WARNING !!! CHANGE WHEN FIXED");
-            //Log.WriteLine($"Using last known compatible SDK: {sdkVersion}");
+            var sdkVersion = "2.2.0-preview1-007522";
+            Log.WriteLine($"WARNING !!! CHANGE WHEN FIXED");
+            Log.WriteLine($"Using last known compatible SDK: {sdkVersion}");
 
             // In theory the actual latest runtime version should be taken from the dependencies.pros file from 
             // https://dotnet.myget.org/feed/aspnetcore-dev/package/nuget/Internal.AspNetCore.Universe.Lineup
