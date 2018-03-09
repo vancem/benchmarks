@@ -757,13 +757,13 @@ namespace BenchmarkServer
             var sdkVersionPath = Path.Combine(buildToolsPath, Path.GetFileName(_sdkVersionUrl));
             await DownloadFileAsync(_sdkVersionUrl, sdkVersionPath, maxRetries: 5);
 
-            //var sdkVersion = File.ReadAllText(sdkVersionPath).Trim();
-            //Log.WriteLine($"Detecting latest SDK version: {sdkVersion}");
+            var sdkVersion = File.ReadAllText(sdkVersionPath).Trim();
+            Log.WriteLine($"Detecting compatible SDK version: {sdkVersion}");
 
             // This is the last known working SDK with Benchmarks on Linux
-            var sdkVersion = "2.2.0-preview1-007522";
-            Log.WriteLine($"WARNING !!! CHANGE WHEN FIXED");
-            Log.WriteLine($"Using last known compatible SDK: {sdkVersion}");
+            //var sdkVersion = "2.2.0-preview1-007522";
+            //Log.WriteLine($"WARNING !!! CHANGE WHEN FIXED");
+            //Log.WriteLine($"Using last known compatible SDK: {sdkVersion}");
 
             // In theory the actual latest runtime version should be taken from the dependencies.pros file from 
             // https://dotnet.myget.org/feed/aspnetcore-dev/package/nuget/Internal.AspNetCore.Universe.Lineup
@@ -917,10 +917,6 @@ namespace BenchmarkServer
                 $"/p:BenchmarksRuntimeFrameworkVersion={runtimeFrameworkVersion} " +
                 $"/p:BenchmarksTargetFramework={targetFramework} ";
 
-            ProcessUtil.Run(dotnetExecutable, $"restore /p:VersionSuffix=zzzzz-99999 {buildParameters}",
-                workingDirectory: benchmarkedApp,
-                environmentVariables: env);
-
             if (job.UseRuntimeStore)
             {
                 ProcessUtil.Run(dotnetExecutable, $"build -c Release {buildParameters}",
@@ -929,13 +925,12 @@ namespace BenchmarkServer
             }
             else
             {
-                // This flag is necessary when using the .All metapackage
-                buildParameters += " /p:PublishWithAspNetCoreTargetManifest=false";
-
-                // This flag is necessary when using the .All metapackage since ASP.NET shared runtime 2.1
-                buildParameters += " /p:MicrosoftNETPlatformLibrary=Microsoft.NETCore.App";
-
                 var outputFolder = Path.Combine(benchmarkedApp, "published");
+
+                // Render detected SDK version (global.json) and available runtimes
+                ProcessUtil.Run(dotnetExecutable, $"--info",
+                    workingDirectory: benchmarkedApp,
+                    environmentVariables: env);
 
                 ProcessUtil.Run(dotnetExecutable, $"publish -c Release -o {outputFolder} {buildParameters}",
                     workingDirectory: benchmarkedApp,
@@ -1008,7 +1003,7 @@ namespace BenchmarkServer
             var latestAspNetCoreRuntime = (string)aspnetCoreRuntime["items"].Last()["upper"];
 
 
-            Log.WriteLine($"Detecting latest runtime version: {latestAspNetCoreRuntime}");
+            Log.WriteLine($"Detecting ASP.NET runtime version: {latestAspNetCoreRuntime}");
             return latestAspNetCoreRuntime;
         }
 
