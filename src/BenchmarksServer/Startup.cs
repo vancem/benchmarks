@@ -1358,7 +1358,7 @@ namespace BenchmarkServer
                     Arguments = arguments,
                     WorkingDirectory = job.BasePath,
                     RedirectStandardOutput = true,
-                    RedirectStandardError = true,
+                    //RedirectStandardError = true,
                     UseShellExecute = false,
                 },
                 EnableRaisingEvents = true
