@@ -624,7 +624,7 @@ namespace BenchmarkServer
                     Arguments = arguments,
                     WorkingDirectory = workingDirectory,
                     RedirectStandardOutput = true,
-                    RedirectStandardInput = true,
+                    RedirectStandardError = true,
                     UseShellExecute = false,
                 },
                 EnableRaisingEvents = true
