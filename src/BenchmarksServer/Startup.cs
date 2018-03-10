@@ -296,7 +296,6 @@ namespace BenchmarkServer
                         string dotnetDir = dotnetHome;
                         string benchmarksDir = null;
                         var standardOutput = new StringBuilder();
-                        var standardError = new StringBuilder();
 
                         var perfviewEnabled = job.Collect && OperatingSystem == OperatingSystem.Windows;
 
@@ -342,7 +341,7 @@ namespace BenchmarkServer
                                     if (benchmarksDir != null && dotnetDir != null)
                                     {
                                         Debug.Assert(process == null);
-                                        process = StartProcess(hostname, Path.Combine(tempDir, benchmarksDir), job, dotnetDir, perfviewEnabled, standardOutput, standardError);
+                                        process = StartProcess(hostname, Path.Combine(tempDir, benchmarksDir), job, dotnetDir, perfviewEnabled, standardOutput);
 
                                         job.ProcessId = process.Id;
                                     }
@@ -396,7 +395,7 @@ namespace BenchmarkServer
                                                 {
                                                     Log.WriteLine($"Job failed");
 
-                                                    job.Error = "Job failed at runtime\n" + standardOutput.ToString() + "\n" + standardError.ToString();
+                                                    job.Error = "Job failed at runtime\n" + standardOutput.ToString();
                                                     job.State = ServerState.Failed;
                                                 }
                                             }
@@ -1311,7 +1310,7 @@ namespace BenchmarkServer
                 : Path.Combine(dotnetHome, "dotnet");
         }
 
-        private static Process StartProcess(string hostname, string benchmarksRepo, ServerJob job, string dotnetHome, bool perfview, StringBuilder standardOutput, StringBuilder standardError)
+        private static Process StartProcess(string hostname, string benchmarksRepo, ServerJob job, string dotnetHome, bool perfview, StringBuilder standardOutput)
         {
             var serverUrl = $"{job.Scheme.ToString().ToLowerInvariant()}://{hostname}:{job.Port}";
             var dotnetFilename = GetDotNetExecutable(dotnetHome);
@@ -1358,7 +1357,6 @@ namespace BenchmarkServer
                     Arguments = arguments,
                     WorkingDirectory = job.BasePath,
                     RedirectStandardOutput = true,
-                    //RedirectStandardError = true,
                     UseShellExecute = false,
                 },
                 EnableRaisingEvents = true
@@ -1436,15 +1434,6 @@ namespace BenchmarkServer
                         // Mark the job as running to allow the Client to start the test
                         job.State = ServerState.Running;
                     }
-                }
-            };
-
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e != null && e.Data != null)
-                {
-                    Log.WriteLine(e.Data);
-                    standardError.AppendLine(e.Data);
                 }
             };
 
