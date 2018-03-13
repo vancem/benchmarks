@@ -124,7 +124,7 @@ namespace Benchmarks
                     {
                         if (threadCount > 0)
                         {
-                            x.IOQueueCount = 16;
+                            x.IOQueueCount = threadCount;
                         }
 
                         Console.WriteLine($"Using Sockets with {x.IOQueueCount} threads");
