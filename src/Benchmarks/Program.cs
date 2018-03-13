@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Server.HttpSys;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Adapter.Internal;
 using Microsoft.AspNetCore.Server.Kestrel.Transport.Abstractions.Internal;
+using Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -98,8 +99,7 @@ namespace Benchmarks
                 var threadCount = GetThreadCount(config);
                 var kestrelTransport = config["KestrelTransport"];
 
-                if (threadCount > 0 || threadPoolDispatching == false ||
-                    string.Equals(kestrelTransport, "Libuv", StringComparison.OrdinalIgnoreCase))
+                if (threadPoolDispatching == false || string.Equals(kestrelTransport, "Libuv", StringComparison.OrdinalIgnoreCase))
                 {
                     webHostBuilder.UseLibuv(options =>
                     {
@@ -117,7 +117,17 @@ namespace Benchmarks
                 }
                 else if (string.Equals(kestrelTransport, "Sockets", StringComparison.OrdinalIgnoreCase))
                 {
+#if DOTNET210
+                    webHostBuilder.UseSockets(x =>
+                    {
+                        if (threadCount > 0)
+                        {
+                            x.IOQueueCount = 16;
+                        }
+                    });
+#else
                     webHostBuilder.UseSockets();
+#endif
                 }
                 else if (string.IsNullOrEmpty(kestrelTransport))
                 {
