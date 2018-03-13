@@ -113,6 +113,8 @@ namespace Benchmarks
                             // and the thread count wasn't specified then use 2 * number of logical cores
                             options.ThreadCount = Environment.ProcessorCount * 2;
                         }
+
+                        Console.WriteLine($"Using Libuv with {options.ThreadCount} threads");
                     });
                 }
                 else if (string.Equals(kestrelTransport, "Sockets", StringComparison.OrdinalIgnoreCase))
@@ -124,9 +126,12 @@ namespace Benchmarks
                         {
                             x.IOQueueCount = 16;
                         }
+
+                        Console.WriteLine($"Using Sockets with {x.IOQueueCount} threads");
                     });
 #else
                     webHostBuilder.UseSockets();
+                    Console.WriteLine($"Using Sockets");
 #endif
                 }
                 else if (string.IsNullOrEmpty(kestrelTransport))
