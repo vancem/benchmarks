@@ -125,6 +125,12 @@ namespace Benchmarks
                         if (threadCount > 0)
                         {
                             x.IOQueueCount = threadCount;
+
+                            // Set the number of I/O workers in the .NET Threadpool as well 
+                            int workers, ioWorkers;
+                            ThreadPool.GetMaxThreads(out workers, out ioWorkers);
+                            ThreadPool.SetMaxThreads(workers, threadCount);
+                            Console.WriteLine($"Set ThreadPools Max IO Workers to {threadCount}");
                         }
 
                         Console.WriteLine($"Using Sockets with {x.IOQueueCount} threads");
