@@ -9,6 +9,15 @@ using Benchmarks.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
+using System.Diagnostics.Tracing;
+
+[EventSource(Name = "AspNet.Harness")]
+public class HarnessEventSource : EventSource
+{
+    public void RequestTick(int count) { if (IsEnabled()) WriteEvent(1, count); }
+
+    public static HarnessEventSource Log = new HarnessEventSource();
+}
 
 namespace Benchmarks.Middleware
 {
@@ -18,6 +27,7 @@ namespace Benchmarks.Middleware
         private static readonly JsonSerializer _json = new JsonSerializer();
         private static readonly UTF8Encoding _encoding = new UTF8Encoding(false);
         private const int _bufferSize = 27;
+        private int _count;
 
         private readonly RequestDelegate _next;
 
@@ -28,6 +38,10 @@ namespace Benchmarks.Middleware
 
         public Task Invoke(HttpContext httpContext)
         {
+            _count++;
+            if ((_count & 0x3FF) == 0)    // every 1024 requests.  
+                HarnessEventSource.Log.RequestTick(_count);
+
             if (httpContext.Request.Path.StartsWithSegments(_path, StringComparison.Ordinal))
             {
                 httpContext.Response.StatusCode = 200;
