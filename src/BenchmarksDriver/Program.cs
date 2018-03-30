@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 using System.Web;
 using Benchmarks.ClientJob;
 using Benchmarks.ServerJob;
-using BenchmarksWorkers;
+using BenchmarksDriver.Serializers;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -68,6 +68,10 @@ namespace BenchmarksDriver
                 "An endpoint to call before the application has shut down.", CommandOptionType.SingleValue);
             var spanOption = app.Option("-sp|--span",
                 "The time during which the client jobs are repeated, in 'HH:mm:ss' format. e.g., 48:00:00 for 2 days.", CommandOptionType.SingleValue);
+            var windowsOnlyOption = app.Option("--windows-only", 
+                "Don't execute the job if the server is not running on Windows", CommandOptionType.NoValue);
+            var linuxOnlyOption = app.Option("--linux-only", 
+                "Don't execute the job if the server is not running on Linux", CommandOptionType.NoValue);
 
             // ServerJob Options
             var databaseOption = app.Option("--database",
@@ -118,7 +122,7 @@ namespace BenchmarksDriver
                 $"Arguments used when collecting a PerfView trace.  Defaults to \"{_defaultTraceArguments}\".",
                 CommandOptionType.SingleValue);
             var traceOutputOption = app.Option("--trace-output",
-                "An optional location to download the trace file to, e.g., --trace-output c:\traces", CommandOptionType.SingleValue);
+                @"Can be a file prefix (app will add *.DATE.RPS*.etl.zip) , or a specific name (end in *.etl.zip) and no DATE.RPS* will be added e.g. --trace-output c:\traces\myTrace", CommandOptionType.SingleValue);
             var disableR2ROption = app.Option("--no-crossgen",
                 "Disables Ready To Run.", CommandOptionType.NoValue);
             var collectR2RLogOption = app.Option("--collect-crossgen",
@@ -583,6 +587,18 @@ namespace BenchmarksDriver
                     }
                 }
 
+                Benchmarks.ServerJob.OperatingSystem? requiredOperatingSystem = null;
+
+                if (windowsOnlyOption.HasValue())
+                {
+                    requiredOperatingSystem = Benchmarks.ServerJob.OperatingSystem.Windows;
+                }
+
+                if (linuxOnlyOption.HasValue())
+                {
+                    requiredOperatingSystem = Benchmarks.ServerJob.OperatingSystem.Linux;
+                }
+
                 return Run(
                     new Uri(server), 
                     new Uri(client), 
@@ -598,8 +614,8 @@ namespace BenchmarksDriver
                     collectR2RLogOption.HasValue(),
                     traceOutputOption.Value(),
                     outputFileOption,
-                    runtimeFileOption
-                    ).Result;
+                    runtimeFileOption,
+                    requiredOperatingSystem).Result;
             });
 
             // Resolve reponse files from urls
@@ -641,7 +657,9 @@ namespace BenchmarksDriver
             bool collectR2RLog,
             string traceDestination,
             CommandOption outputFileOption,
-            CommandOption runtimeFileOption)
+            CommandOption runtimeFileOption,
+            Benchmarks.ServerJob.OperatingSystem? requiredOperatingSystem
+            )
         {
             var scenario = serverJob.Scenario;
             var serverJobsUri = new Uri(serverUri, "/jobs");
@@ -705,6 +723,16 @@ namespace BenchmarksDriver
                         if (!serverJob.OperatingSystem.HasValue)
                         {
                             throw new InvalidOperationException("Server is required to set ServerJob.OperatingSystem.");
+                        }
+
+                        if (requiredOperatingSystem.HasValue && requiredOperatingSystem.Value != serverJob.OperatingSystem)
+                        {
+                            Log($"Job ignored on this OS, stopping job ...");
+
+                            response = await _httpClient.PostAsync(serverJobUri + "/stop", new StringContent(""));
+                            LogVerbose($"{(int)response.StatusCode} {response.StatusCode}");
+
+                            return 0;
                         }
 
                         if (serverJob.State == ServerState.Initializing)
@@ -801,6 +829,7 @@ namespace BenchmarksDriver
                             await Task.Delay(1000);
                         }
                     }
+                    System.Threading.Thread.Sleep(200);  // Make it clear on traces when startup has finished and warmup begins.  
 
                     TimeSpan latencyNoLoad, latencyFirstRequest;
 
@@ -818,16 +847,13 @@ namespace BenchmarksDriver
                         _clientJob.SkipStartupLatencies = false;
 
                         _clientJob.Duration = duration;
-                    }
-                    else
-                    {
-                        Log("Skipping warmup");
+                        System.Threading.Thread.Sleep(200);  // Make it clear on traces when warmup stops and measuring begins. 
                     }
 
+
+                    Log("Measuring");
                     var startTime = DateTime.UtcNow;
-
                     var spanLoop = 0;
-
                     do
                     {
                         if (span > TimeSpan.Zero)
@@ -927,7 +953,7 @@ namespace BenchmarksDriver
                             // Collect Trace
                             if (serverJob.Collect)
                             {
-                                Log($"Collecting trace, this can take 10s of seconds...");
+                                Log($"Post-processing profiler trace, this can take 10s of seconds...");
                                 var uri = serverJobUri + "/trace";
                                 response = await _httpClient.PostAsync(uri, new StringContent(""));
                                 response.EnsureSuccessStatusCode();
@@ -965,28 +991,18 @@ namespace BenchmarksDriver
                                 }
 
                                 Log($"Downloading trace...");
-
-                                var filename = "trace.etl.zip";
-
-                                if (!String.IsNullOrEmpty(traceDestination))
+                                if (traceDestination == null || !traceDestination.EndsWith(".etl.zip", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    filename = Path.Combine(traceDestination, filename);
+                                    // If it does not end with a *.etl.zip then we add a DATE.etl.zip to it
+                                    if (String.IsNullOrEmpty(traceDestination))
+                                        traceDestination = "trace";
+
+                                    string rpsStr = "RPS-" + ((int)((statistics.RequestsPerSecond+500) / 1000)) + "K";
+                                    traceDestination = traceDestination + "." + DateTime.Now.ToString("MM-dd-HH-mm-ss") + "." + rpsStr + ".etl.zip";
                                 }
+                                Log($"Creating trace: {traceDestination}");
+                                await File.WriteAllBytesAsync(traceDestination, await _httpClient.GetByteArrayAsync(uri));
 
-                                var counter = 1;
-                                while (File.Exists(filename))
-                                {
-                                    filename = $"trace ({counter++}).etl.zip";
-
-                                    if (!String.IsNullOrEmpty(traceDestination))
-                                    {
-                                        filename = Path.Combine(traceDestination, filename);
-                                    }
-                                }
-
-                                await File.WriteAllBytesAsync(filename, await _httpClient.GetByteArrayAsync(uri));
-
-                                Log($"Trace created at {filename}");
                             }
 
                             var shouldComputeResults = results.Any() && iterations == i;
@@ -1029,7 +1045,7 @@ namespace BenchmarksDriver
                                 Log($"First Request (ms):          {average.FirstRequest}");
                                 Log($"Latency (ms):                {average.Latency}");
                                 Log($"Total Requests:              {average.TotalRequests:n0}");
-                                Log($"Duration: (ms)               {average.Duration}");
+                                Log($"Duration (ms):               {average.Duration}");
                                 Log($"Socket Errors:               {average.SocketErrors}");
                                 Log($"Bad Responses:               {average.BadResponses}");
                                 Log($"SDK:                         {serverJob.SdkVersion}");

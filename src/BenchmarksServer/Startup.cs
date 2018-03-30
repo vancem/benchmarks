@@ -133,6 +133,13 @@ namespace BenchmarkServer
 
         public static int Main(string[] args)
         {
+            // Prevent unhandled exceptions in the benchmarked apps from displaying a popup that would block 
+            // the main process on Windows
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                SetErrorMode(ErrorModes.SEM_NONE);
+            }
+
             var app = new CommandLineApplication()
             {
                 Name = "BenchmarksServer",
@@ -1427,31 +1434,11 @@ namespace BenchmarkServer
                     if (job.State == ServerState.Starting &&
                         (e.Data.ToLowerInvariant().Contains("started") || e.Data.ToLowerInvariant().Contains("listening")))
                     {
-                        MarkAsRunning(hostname, benchmarksRepo, job, perfview, stopwatch, process);
+                        MarkAsRunning(hostname, benchmarksRepo, job, stopwatch, process);
                     }
                 }
             };
 
-            stopwatch.Start();
-            process.Start();
-            process.BeginOutputReadLine();
-
-            if (iis)
-            {
-                await WaitToListen(job, hostname);
-                MarkAsRunning(hostname, benchmarksRepo, job, perfview, stopwatch, process);
-            }
-
-            return process;
-        }
-
-        private static void MarkAsRunning(string hostname, string benchmarksRepo, ServerJob job, bool perfview, Stopwatch stopwatch,
-            Process process)
-        {
-            job.StartupMainMethod = stopwatch.Elapsed;
-
-            Log.WriteLine($"Running job '{job.Id}' with scenario '{job.Scenario}'");
-            job.Url = ComputeServerUrl(hostname, job);
 
             // Start perfview?
             if (perfview)
@@ -1481,7 +1468,29 @@ namespace BenchmarkServer
 
                 perfviewArguments += $" \"{job.PerfViewTraceFile}\"";
                 RunPerfview(perfviewArguments, Path.Combine(benchmarksRepo, job.BasePath));
+                Log.WriteLine($"Starting PerfView {perfviewArguments}");
             }
+
+            stopwatch.Start();
+            process.Start();
+            process.BeginOutputReadLine();
+
+            if (iis)
+            {
+                await WaitToListen(job, hostname);
+                MarkAsRunning(hostname, benchmarksRepo, job,  stopwatch, process);
+            }
+
+            return process;
+        }
+
+        private static void MarkAsRunning(string hostname, string benchmarksRepo, ServerJob job, Stopwatch stopwatch,
+            Process process)
+        {
+            job.StartupMainMethod = stopwatch.Elapsed;
+
+            Log.WriteLine($"Running job '{job.Id}' with scenario '{job.Scenario}'");
+            job.Url = ComputeServerUrl(hostname, job);
 
             // Mark the job as running to allow the Client to start the test
             job.State = ServerState.Running;
@@ -1565,5 +1574,18 @@ namespace BenchmarkServer
                 return StringComparer.OrdinalIgnoreCase.GetHashCode(GetRepoName(obj));
             }
         }
+
+        public enum ErrorModes : uint
+        {
+            SYSTEM_DEFAULT = 0x0,
+            SEM_FAILCRITICALERRORS = 0x0001,
+            SEM_NOALIGNMENTFAULTEXCEPT = 0x0004,
+            SEM_NOGPFAULTERRORBOX = 0x0002,
+            SEM_NOOPENFILEERRORBOX = 0x8000,
+            SEM_NONE = SEM_FAILCRITICALERRORS | SEM_NOALIGNMENTFAULTEXCEPT | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX
+        }
+
+        [DllImport("kernel32.dll")]
+        static extern ErrorModes SetErrorMode(ErrorModes uMode);
     }
 }
